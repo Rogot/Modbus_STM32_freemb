@@ -24,6 +24,9 @@
 #include "mb.h"
 #include "mbport.h"
 #include "mt_port.h"
+#include "flash_cmsis.h"
+#include "step_engine.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -33,8 +36,17 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define REG_INPUT_START 1000
-#define REG_INPUT_NREGS 8
+#define DATA_USART2_TX		( 0 )
+#define MODBUS_ENABLE			( 1 )
+
+	/* MODBUS DEFINES BEGIN */
+	#define REG_INPUT_START 5002
+	#define REG_INPUT_NREGS 1
+
+	#define REG_HOLDING_START 0x01
+	#define REG_HOLDING_NREGS 4
+	/* MODBUS DEFINES END */
+	
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -43,11 +55,18 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim4;
+DMA_HandleTypeDef hdma_tim3_ch4_up;
 
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
+extern uint8_t start;
+extern uint8_t print;
+extern t_step_engine step_engine;
+
 extern t_modbus_him_pack rxData;
 extern t_modbus_him_pack txData;
 
@@ -56,17 +75,54 @@ extern uint8_t rx_data_indx;
 extern uint16_t in_count;
 //static uint16_t  rx_data[256];
 //static uint8_t rx_data_indx = 0;
+
+static USHORT usRegHoldingStart = REG_HOLDING_START;
+static USHORT usRegHoldingBuf[REG_HOLDING_NREGS] = { 50 };
+	
 static USHORT usRegInputStart = REG_INPUT_START;
-static USHORT usRegInputBuf[REG_INPUT_NREGS] = {'M', 'o', 'd', 'b', 'u', 's', 0, 0};
-//static USHORT usRegInputBuf[REG_INPUT_NREGS] = {0x5A, 0xA5, 0x05, 0x82, 0x10, 0x00, 0x01};
+static USHORT usRegInputBuf[REG_INPUT_NREGS] = {50};
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_TIM2_Init(void);
+static void MX_TIM4_Init(void);
 /* USER CODE BEGIN PFP */
+
+#if DATA_USART2_TX
+uint16_t cnt = 0;
+
+void DataWrite(uint16_t data) {
+		
+		uint8_t low_byte = data;
+		data = data >> 8;
+		uint8_t high_byte = data;
+		
+		uint8_t mdata[14] = { 0x00 };
+	
+	  mdata[0] = 0x5A;
+		mdata[1] = 0xA5;
+		mdata[2] = 0x0B;
+		mdata[3] = 0x82;
+		mdata[4] = 0x03;
+		mdata[5] = 0x10;
+		mdata[6] = 0x5A;
+		mdata[7] = 0xA5;
+		mdata[8] = 0x01;
+		mdata[9] = 0x00;
+		mdata[10] = 0x00;
+		mdata[11] = 0x01;
+		mdata[12] = high_byte;
+		mdata[13] = low_byte;
+	
+		HAL_UART_Transmit(&huart1, mdata, 14, 300);
+}
+#endif
 
 /* USER CODE END PFP */
 
@@ -103,44 +159,95 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_TIM3_Init();
   MX_USART1_UART_Init();
+  MX_TIM2_Init();
+  MX_TIM4_Init();
   /* USER CODE BEGIN 2 */
-	MT_PORT_SetTimerModule(&htim3);
+	#if MODBUS_ENABLE
+	
+	MT_PORT_SetTimerModule(&htim4);
 	MT_PORT_SetUartModule(&huart1);
 	
 	eMBErrorCode eStatus;
 	//eStatus = eMBInit(MB_RTU, 0x0A, 0, 19200, MB_PAR_NONE);
-	eStatus = eMBInit(MB_RTU, 0x0A, 0, 115200, MB_PAR_NONE);
+	eStatus = eMBInit(MB_RTU, 0x01, 0, 115200, MB_PAR_NONE);
 	eStatus = eMBEnable();
 	if (eStatus != MB_ENOERR)
 	{
 	// Error handling
 	}
+	#endif
+	
+	#if FLASH_ENABLE
+	uint8_t data[8] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
+	uint32_t temp[2] = {0x0};
+	
+	CMSIS_flash_allow_access();
+	CMSIS_internal_flash_erase(FLASH_SNB_SEC_3);
+	
+	for (uint8_t i = 0; i < 2; i++) {
+		temp[i] = CMSIS_internal_flash_read(0x0800C000 + i * 4);
+	}
+	
+	CMSIS_internal_flash_write(data, 0x0800C000, 8); 
+	CMSIS_internal_flash_read(0x0800C000);
+	
+	for (uint8_t i = 0; i < 2; i++) {
+		temp[i] = CMSIS_internal_flash_read(0x0800C000 + i * 4);
+	}
+	#endif
+	
+	#if STEP_ENGINE_ENABLE
+	HAL_DBGMCU_EnableDBGStandbyMode();
+  HAL_DBGMCU_EnableDBGStopMode();
+	DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_TIM3_STOP;
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_SET);
+	
+	
+	
+	init_step_engine(&step_engine);
+	#endif
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+		#if DATA_USART2_TX
+		cnt++;
+		if (cnt >= 255) cnt = 0;
+		DataWrite(cnt);
+		HAL_Delay(10);
+		#endif
+		
+		#if MODBUS_ENABLE
+		eMBPoll();
+		#endif
+		
+		#if STEP_ENGINE_ENABLE
+		
+		if(start==1){
+		  TIM2->CCR1=TIM2->CNT+step_engine.dir*step_engine.speedupCNT;
+		  HAL_DMA_Start_IT(htim3.hdma[TIM_DMA_ID_UPDATE], 
+				(uint32_t)step_engine.speedupbuf, 
+				(uint32_t)&TIM3->ARR, 
+				step_engine.speedupCNT);
+		  __HAL_TIM_ENABLE_DMA(&htim3, TIM_DMA_UPDATE);
+		  step_engine.mode=SPEEDUP;
+		  HAL_TIM_OC_Start(&htim3, TIM_CHANNEL_3);
+		  start=0;
+	  }
+	  if(print){
+		  print=0;
+	  }
+		#endif
+		
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-		#if 0
-		eMBPoll();
-		if (usRegInputBuf[REG_INPUT_NREGS - 1] == 0x00) {	
-			usRegInputBuf[REG_INPUT_NREGS - 1] = 0x01; 
-		} else
-		if (usRegInputBuf[REG_INPUT_NREGS - 1] == 0x01) {
-			usRegInputBuf[REG_INPUT_NREGS - 1] = 0x00;
-		}
-		#endif
-		#if 1
-		eMBPoll();
-    usRegInputBuf[REG_INPUT_NREGS - 2] =  HAL_GetTick() / 1000;
-    usRegInputBuf[REG_INPUT_NREGS - 1] =  HAL_GetTick();
-		#endif
-	}
+  }
   /* USER CODE END 3 */
 }
 
@@ -191,6 +298,65 @@ void SystemClock_Config(void)
 }
 
 /**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_SlaveConfigTypeDef sSlaveConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 0;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 4294967295;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_OC_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sSlaveConfig.SlaveMode = TIM_SLAVEMODE_EXTERNAL1;
+  sSlaveConfig.InputTrigger = TIM_TS_ITR2;
+  if (HAL_TIM_SlaveConfigSynchro(&htim2, &sSlaveConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_ACTIVE;
+  sConfigOC.Pulse = 4294967295;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_OC_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+
+}
+
+/**
   * @brief TIM3 Initialization Function
   * @param None
   * @retval None
@@ -204,14 +370,15 @@ static void MX_TIM3_Init(void)
 
   TIM_ClockConfigTypeDef sClockSourceConfig = {0};
   TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
 
   /* USER CODE BEGIN TIM3_Init 1 */
 
   /* USER CODE END TIM3_Init 1 */
   htim3.Instance = TIM3;
-  htim3.Init.Prescaler = 71;
+  htim3.Init.Prescaler = 719;
   htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim3.Init.Period = 50;
+  htim3.Init.Period = 1;
   htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
   htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
   if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
@@ -223,15 +390,73 @@ static void MX_TIM3_Init(void)
   {
     Error_Handler();
   }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  if (HAL_TIM_OC_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_UPDATE;
   sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
   if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_TOGGLE;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_OC_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
   {
     Error_Handler();
   }
   /* USER CODE BEGIN TIM3_Init 2 */
 
   /* USER CODE END TIM3_Init 2 */
+  HAL_TIM_MspPostInit(&htim3);
+
+}
+
+/**
+  * @brief TIM4 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM4_Init(void)
+{
+
+  /* USER CODE BEGIN TIM4_Init 0 */
+
+  /* USER CODE END TIM4_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM4_Init 1 */
+
+  /* USER CODE END TIM4_Init 1 */
+  htim4.Instance = TIM4;
+  htim4.Init.Prescaler = 71;
+  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim4.Init.Period = 50;
+  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM4_Init 2 */
+
+  /* USER CODE END TIM4_Init 2 */
 
 }
 
@@ -269,12 +494,29 @@ static void MX_USART1_UART_Init(void)
 }
 
 /**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Stream2_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
+
+}
+
+/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
 /* USER CODE BEGIN MX_GPIO_Init_1 */
 /* USER CODE END MX_GPIO_Init_1 */
 
@@ -282,6 +524,46 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOH_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : PA0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PA1 */
+  GPIO_InitStruct.Pin = GPIO_PIN_1;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PB1 */
+  GPIO_InitStruct.Pin = GPIO_PIN_1;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PC12 */
+  GPIO_InitStruct.Pin = GPIO_PIN_12;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI1_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI1_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -315,10 +597,43 @@ eMBErrorCode eMBRegInputCB(UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNReg
 eMBErrorCode eMBRegHoldingCB(UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNRegs,
                              eMBRegisterMode eMode)
 {
-	eMBErrorCode	eStatus = MB_ENOERR;
-	int 					iRegIndex;
-	
-  return MB_ENOREG;
+	eMBErrorCode    eStatus = MB_ENOERR;
+    int             iRegIndex;
+
+    if( ( usAddress >= REG_HOLDING_START ) &&
+        ( usAddress + usNRegs <= REG_HOLDING_START + REG_HOLDING_NREGS ) )
+    {
+        iRegIndex = ( int )( usAddress - usRegHoldingStart );
+        switch ( eMode )
+        {
+            /* Pass current register values to the protocol stack. */
+        case MB_REG_READ:
+            while( usNRegs > 0 )
+            {
+                *pucRegBuffer++ = ( unsigned char )( usRegHoldingBuf[iRegIndex] >> 8 );
+                *pucRegBuffer++ = ( unsigned char )( usRegHoldingBuf[iRegIndex] & 0xFF );
+                iRegIndex++;
+                usNRegs--;
+            }
+            break;
+
+            /* Update current register values with new values from the
+             * protocol stack. */
+        case MB_REG_WRITE:
+            while( usNRegs > 0 )
+            {
+                usRegHoldingBuf[iRegIndex] = *pucRegBuffer++ << 8;
+                usRegHoldingBuf[iRegIndex] |= *pucRegBuffer++;
+                iRegIndex++;
+                usNRegs--;
+            }
+        }
+    }
+    else
+    {
+        eStatus = MB_ENOREG;
+    }
+    return eStatus;
 }
 /*----------------------------------------------------------------------------*/
 eMBErrorCode eMBRegCoilsCB(UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNCoils,

@@ -124,6 +124,12 @@ PR_BEGIN_EXTERN_C
 /*! \brief If the <em>Read/Write Multiple Registers</em> function should be enabled. */
 #define MB_FUNC_READWRITE_HOLDING_ENABLED       (  1 )
 
+/*! \brief If the <em>Read DWIN function should be enabled. */
+#define MB_FUNC_READ_DWIN_ENABLED       				(  1 )
+
+/*! \brief If the <em>Write DWIN function should be enabled. */
+#define MB_FUNC_WRITE_DWIN_ENABLED       				(  1 )
+
 /*! @} */
 #ifdef __cplusplus
     PR_END_EXTERN_C

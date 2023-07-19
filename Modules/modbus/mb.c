@@ -58,6 +58,8 @@
 
 /* ----------------------- Static variables ---------------------------------*/
 
+extern t_modbus_him_pack rxData;
+
 static UCHAR    ucMBAddress;
 static eMBMode  eMBCurrentMode;
 
@@ -119,8 +121,11 @@ static xMBFunctionHandler xFuncHandlers[MB_FUNC_HANDLERS_MAX] = {
 #if MB_FUNC_WRITE_MULTIPLE_COILS_ENABLED > 0
     {MB_FUNC_WRITE_MULTIPLE_COILS, eMBFuncWriteMultipleCoils},
 #endif
-#if MB_FUNC_READ_DISCRETE_INPUTS_ENABLED > 0
-    {MB_FUNC_READ_DISCRETE_INPUTS, eMBFuncReadDiscreteInputs},
+#if MB_FUNC_READ_DWIN_ENABLED > 0
+  //  {MB_FUNC_READ_DWIN, eMBFuncReadDwin},
+#endif
+#if MB_FUNC_WRITE_DWIN_ENABLED > 0
+  //  {MB_FUNC_WRITE_DWIN, eMBFuncWriteDwin},
 #endif
 };
 
@@ -368,7 +373,9 @@ eMBPoll( void )
             break;
 
         case EV_EXECUTE:
-            ucFunctionCode = ucMBFrame[MB_PDU_FUNC_OFF];
+						
+						ucFunctionCode = ucMBFrame[MB_PDU_FUNC_OFF];
+						
             eException = MB_EX_ILLEGAL_FUNCTION;
             for( i = 0; i < MB_FUNC_HANDLERS_MAX; i++ )
             {
@@ -407,5 +414,5 @@ eMBPoll( void )
             break;
         }
     }
-    return MB_ENOERR;
+     return MB_ENOERR;
 }

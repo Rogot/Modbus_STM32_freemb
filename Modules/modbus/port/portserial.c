@@ -71,7 +71,7 @@ vMBPortSerialEnable( BOOL xRxEnable, BOOL xTxEnable )
 BOOL
 xMBPortSerialInit( UCHAR ucPORT, ULONG ulBaudRate, UCHAR ucDataBits, eMBParity eParity )
 {
-		rxData.frame_header = 0x00;
+		rxData.id_slave = 0x00;
 		rxData.byte_count = 0x0;
 		rxData.cmd = 0x0;
 	  rxData.start_address = 0x0;
@@ -82,7 +82,7 @@ xMBPortSerialInit( UCHAR ucPORT, ULONG ulBaudRate, UCHAR ucDataBits, eMBParity e
 		}			
 		rxData.crc = 0x00;
 		
-		txData.frame_header = 0x00;
+		txData.id_slave = 0x00;
 		txData.byte_count = 0x0;
 		txData.cmd = 0x0;
 		txData.start_address = 0x0;
@@ -142,13 +142,12 @@ static void prvvUARTRxISR( void )
 		pxMBFrameCBByteReceived(  );
 }
 
-extern volatile UCHAR  ucRTUBuf[];
-
 /* --------------------------------------------------------------------------*/
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
   if (huart->Instance == modbusUart->Instance)
   {
+		modbusUart->Instance->SR &= USART_SR_TXE;
     prvvUARTTxReadyISR();
 	}
 }
@@ -160,16 +159,15 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
   if (huart->Instance == modbusUart->Instance)
   {
+		modbusUart->Instance->SR &= USART_SR_RXNE;
 		prvvUARTRxISR();
 		#if 1
-		rxData.frame_header = (ucRTUBuf[0] << 8) | ucRTUBuf[1];
-		rxData.byte_count = ucRTUBuf[2];
-		rxData.cmd = ucRTUBuf[3];
-		rxData.start_address = ucRTUBuf[4] << 8 | ucRTUBuf[5];
-		//rxData.data_size = ucRTUBuf[6];
+		rxData.id_slave = ucRTUBuf[0];
+		rxData.cmd = ucRTUBuf[1];
+		rxData.start_address = ucRTUBuf[2] << 8 | ucRTUBuf[3];
 		
 		for (uint8_t i = 0; i < rxData.byte_count - 3; i++) {
-				rxData.data[i] = ucRTUBuf[7 + i];
+				rxData.data[i] = ucRTUBuf[5 + i];
 		}
 		//rxData.crc = (ucRTUBuf[3 + rxData.byte_count - 2] << 8) | ucRTUBuf[3 + rxData.byte_count - 1];
 		#endif

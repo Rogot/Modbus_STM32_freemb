@@ -77,7 +77,7 @@ PR_BEGIN_EXTERN_C
 /* ----------------------- Structs ------------------------------------------*/
 
 typedef struct MODBUS_HMI_PACKET {
-	uint16_t frame_header;
+	uint8_t id_slave;
 	uint8_t byte_count;
 	uint8_t cmd;
 	uint16_t start_address;
