@@ -12,4 +12,6 @@ typedef struct HMI_REGISTERS {
 	uint16_t air_pubping_lvl;
 }t_hmi_reg;
 
+t_hmi_reg programs[10];
+
 #endif //!HMI_INTERFACE_H

@@ -34,6 +34,8 @@
 PR_BEGIN_EXTERN_C
 #endif
 
+#include "port.h"
+
 /* ----------------------- Type definitions ---------------------------------*/
 
 typedef enum

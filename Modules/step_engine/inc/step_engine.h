@@ -5,10 +5,11 @@
 #include "stm32f4xx_hal.h"
 #include <stdio.h>
 #include "math.h"
+#include "mbport.h"
 
 /* DEFINE BEGIN */
 #define STEP_ENGINE_ENABLE		 			( 1 )
-#define STEP_ENGINE_TEST_ENABLE		  ( 1 )
+#define STEP_ENGINE_TEST_ENABLE		  ( 0 )
 
 #define BASE_FREQ 1e+5
 #define ACCEL_TIME_SEC 1.0
@@ -30,6 +31,7 @@ typedef struct step_engine {
 	float vel;
 	float accel;
 	size_t accel_size;
+	size_t cur_accel_size;
 	uint8_t mode;
 	int dir;
 	uint16_t speedupbuf[10240];
@@ -37,10 +39,13 @@ typedef struct step_engine {
 	uint32_t speedupCNT;
 	uint32_t runCNT;
 	uint32_t slowdownCNT;
+	float cnt;
 } t_step_engine;
 
 void init_step_engine(t_step_engine* step_eng);
 void led_init(); /* LED-pin init */
+
+void move_step_engine(t_step_engine* step_eng, uint16_t pos, float vel);
 
 inline float mysqrt(float value);
 

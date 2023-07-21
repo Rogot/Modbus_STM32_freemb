@@ -200,12 +200,16 @@ int main(void)
 	#endif
 	
 	#if STEP_ENGINE_ENABLE
-	HAL_DBGMCU_EnableDBGStandbyMode();
-  HAL_DBGMCU_EnableDBGStopMode();
-	DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_TIM3_STOP;
+	//HAL_DBGMCU_EnableDBGStandbyMode();
+  //HAL_DBGMCU_EnableDBGStopMode();
+	//DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_TIM3_STOP;
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_SET);
 	
 	
+	step_engine.mode = STOP;
+	step_engine.vel = SPEED_MIN;
+	step_engine.accel_size = 0;
+	step_engine.dir = 1;
 	
 	init_step_engine(&step_engine);
 	#endif
@@ -222,26 +226,37 @@ int main(void)
 		HAL_Delay(10);
 		#endif
 		
-		#if MODBUS_ENABLE
-		eMBPoll();
+		#if STEP_ENGINE_ENABLE
+		if( usRegHoldingBuf[1] == 0x01){
+			usRegHoldingBuf[1] = 0x00;
+			//if(start==1){
+			//start = 0; 
+			#if STEP_ENGINE_TEST_ENABLE
+				TIM2->CCR1=TIM2->CNT+step_engine.dir*step_engine.speedupCNT;
+				HAL_DMA_Start_IT(htim3.hdma[TIM_DMA_ID_UPDATE], 
+					(uint32_t)step_engine.speedupbuf, 
+					(uint32_t)&TIM3->ARR, 
+					step_engine.speedupCNT);
+				__HAL_TIM_ENABLE_DMA(&htim3, TIM_DMA_UPDATE);
+				step_engine.mode=SPEEDUP;
+				HAL_TIM_OC_Start(&htim3, TIM_CHANNEL_3);
+			#endif
+			
+			#if !STEP_ENGINE_TEST_ENABLE
+			if (usRegHoldingBuf[3] > 0x04 && usRegHoldingBuf[2] > 1) {
+				move_step_engine(&step_engine, usRegHoldingBuf[2] * 100, (float)(
+												(float)usRegHoldingBuf[3] / (float)2550));
+			}
+			//move_step_engine(&step_engine, usRegHoldingBuf[2] * 100, 0.02);
+			//move_step_engine(&step_engine, 2000, 0.02);
+			#endif
+			
+			//}
+		}
 		#endif
 		
-		#if STEP_ENGINE_ENABLE
-		
-		if(start==1){
-		  TIM2->CCR1=TIM2->CNT+step_engine.dir*step_engine.speedupCNT;
-		  HAL_DMA_Start_IT(htim3.hdma[TIM_DMA_ID_UPDATE], 
-				(uint32_t)step_engine.speedupbuf, 
-				(uint32_t)&TIM3->ARR, 
-				step_engine.speedupCNT);
-		  __HAL_TIM_ENABLE_DMA(&htim3, TIM_DMA_UPDATE);
-		  step_engine.mode=SPEEDUP;
-		  HAL_TIM_OC_Start(&htim3, TIM_CHANNEL_3);
-		  start=0;
-	  }
-	  if(print){
-		  print=0;
-	  }
+		#if MODBUS_ENABLE
+		eMBPoll();
 		#endif
 		
     /* USER CODE END WHILE */
@@ -570,6 +585,27 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+ if((GPIO_Pin== GPIO_PIN_1) && (step_engine.mode == STOP) && (usRegHoldingBuf[1] == 0)) {
+	 if(step_engine.dir == 1){
+		 step_engine.dir = -1;
+		 TIM2->CR1 |= TIM_CR1_DIR;
+		 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
+	 }
+	 else {
+		 step_engine.dir = 1;
+		 TIM2->CR1 &= ~(TIM_CR1_DIR);
+		 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
+	 }
+	 //usRegHoldingBuf[1] = 0x01;
+	 start = 1;
+   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_RESET);
+
+ }
+}
+
 eMBErrorCode eMBRegInputCB(UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNRegs)
 {
   eMBErrorCode eStatus = MB_ENOERR;
