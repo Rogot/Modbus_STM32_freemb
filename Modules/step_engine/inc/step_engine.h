@@ -39,13 +39,16 @@ typedef struct step_engine {
 	uint32_t speedupCNT;
 	uint32_t runCNT;
 	uint32_t slowdownCNT;
-	float cnt;
+	int16_t cnt;
+	uint8_t manual_mode;
+	uint8_t manual_move_right;
+	uint8_t manual_move_left;
 } t_step_engine;
 
 void init_step_engine(t_step_engine* step_eng);
 void led_init(); /* LED-pin init */
 
-void move_step_engine(t_step_engine* step_eng, uint16_t pos, float vel);
+void move_step_engine(t_step_engine* step_eng, int16_t pos, float vel);
 
 inline float mysqrt(float value);
 

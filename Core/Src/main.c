@@ -24,8 +24,10 @@
 #include "mb.h"
 #include "mbport.h"
 #include "mt_port.h"
-#include "flash_cmsis.h"
-#include "step_engine.h"
+//#include "flash_cmsis.h"
+//#include "step_engine.h"
+#include "hmi_interface.h"
+
 
 /* USER CODE END Includes */
 
@@ -38,14 +40,6 @@
 /* USER CODE BEGIN PD */
 #define DATA_USART2_TX		( 0 )
 #define MODBUS_ENABLE			( 1 )
-
-	/* MODBUS DEFINES BEGIN */
-	#define REG_INPUT_START 5002
-	#define REG_INPUT_NREGS 1
-
-	#define REG_HOLDING_START 0x01
-	#define REG_HOLDING_NREGS 4
-	/* MODBUS DEFINES END */
 	
 /* USER CODE END PD */
 
@@ -63,6 +57,8 @@ DMA_HandleTypeDef hdma_tim3_ch4_up;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
+extern t_control ctrl;
+extern t_hmi_reg programs[10];
 extern uint8_t start;
 extern uint8_t print;
 extern t_step_engine step_engine;
@@ -76,11 +72,13 @@ extern uint16_t in_count;
 //static uint16_t  rx_data[256];
 //static uint8_t rx_data_indx = 0;
 
+
 static USHORT usRegHoldingStart = REG_HOLDING_START;
-static USHORT usRegHoldingBuf[REG_HOLDING_NREGS] = { 50 };
+static int usRegHoldingBuf[REG_HOLDING_NREGS] = { 0x0 };
 	
 static USHORT usRegInputStart = REG_INPUT_START;
-static USHORT usRegInputBuf[REG_INPUT_NREGS] = {50};
+static USHORT usRegInputBuf[REG_INPUT_NREGS] = { 0x0 };
+t_devices dev;
 
 /* USER CODE END PV */
 
@@ -178,6 +176,13 @@ int main(void)
 	{
 	// Error handling
 	}
+	
+	dev.step_engine = &step_engine;
+	
+	ctrl.dev = &dev;
+	ctrl.programms = &(*programs);
+	usRegHoldingBuf[NUM_EXE_PROGRAM] = 0x01;
+	init_HMI(&ctrl);
 	#endif
 	
 	#if FLASH_ENABLE
@@ -213,6 +218,8 @@ int main(void)
 	
 	init_step_engine(&step_engine);
 	#endif
+	eMBEventType    eEvent;
+	uint8_t count = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -224,35 +231,10 @@ int main(void)
 		if (cnt >= 255) cnt = 0;
 		DataWrite(cnt);
 		HAL_Delay(10);
-		#endif
+		#endif		
 		
-		#if STEP_ENGINE_ENABLE
-		if( usRegHoldingBuf[1] == 0x01){
-			usRegHoldingBuf[1] = 0x00;
-			//if(start==1){
-			//start = 0; 
-			#if STEP_ENGINE_TEST_ENABLE
-				TIM2->CCR1=TIM2->CNT+step_engine.dir*step_engine.speedupCNT;
-				HAL_DMA_Start_IT(htim3.hdma[TIM_DMA_ID_UPDATE], 
-					(uint32_t)step_engine.speedupbuf, 
-					(uint32_t)&TIM3->ARR, 
-					step_engine.speedupCNT);
-				__HAL_TIM_ENABLE_DMA(&htim3, TIM_DMA_UPDATE);
-				step_engine.mode=SPEEDUP;
-				HAL_TIM_OC_Start(&htim3, TIM_CHANNEL_3);
-			#endif
-			
-			#if !STEP_ENGINE_TEST_ENABLE
-			if (usRegHoldingBuf[3] > 0x04 && usRegHoldingBuf[2] > 1) {
-				move_step_engine(&step_engine, usRegHoldingBuf[2] * 100, (float)(
-												(float)usRegHoldingBuf[3] / (float)2550));
-			}
-			//move_step_engine(&step_engine, usRegHoldingBuf[2] * 100, 0.02);
-			//move_step_engine(&step_engine, 2000, 0.02);
-			#endif
-			
-			//}
-		}
+		#if PEREPH_ENABLE
+		eHMIPoll(&ctrl, usRegHoldingBuf);
 		#endif
 		
 		#if MODBUS_ENABLE
@@ -574,10 +556,10 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI0_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(EXTI0_IRQn, 1, 0);
   HAL_NVIC_EnableIRQ(EXTI0_IRQn);
 
-  HAL_NVIC_SetPriority(EXTI1_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(EXTI1_IRQn, 1, 0);
   HAL_NVIC_EnableIRQ(EXTI1_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
