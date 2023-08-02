@@ -114,10 +114,13 @@ void move_start_pos(t_control* comtrl) {
 	int32_t start_pos = 2147483647;
 	int32_t cur_pos = TIM2->CCR1;
 	
-	int16_t res = cur_pos - start_pos;
+	int32_t res = (int16_t)start_pos - (int16_t )cur_pos;
 	
-	move_step_engine(comtrl->dev->step_engine, res * 100, (float)(
-									(float)60 / (float)2550));
+	if (res > 48 || res < -48) {
+	
+	move_step_engine(comtrl->dev->step_engine, (int16_t )(res), (float)(
+									(float)comtrl->current_vel / (float)2550));
+	}
 }
 
 
@@ -126,6 +129,7 @@ void eHMIPoll(t_control* comtrl, int* usRegBuf) {
 	if( comtrl->is_manual == 0x01 && comtrl->is_launch == 0x00
 				&& comtrl->dev->step_engine->mode == STOP){
 		comtrl->is_manual = 0x00;
+		comtrl->dev->step_engine->start_pose_mode = 0x00;			
 		munual_mode(comtrl);		
 	}
 	if(comtrl->is_manual == 0x00 && comtrl->is_launch == 0x01 
@@ -137,8 +141,11 @@ void eHMIPoll(t_control* comtrl, int* usRegBuf) {
 	if (comtrl->save_prog != 0) {
 		refresh_prog_parameters_FLASH(comtrl);
 	}
-	if (comtrl->start_pos_step_engine == 1) {
+	if (comtrl->start_pos_step_engine == 0x01 
+			&& comtrl->dev->step_engine->mode == STOP) {
+		comtrl->dev->step_engine->start_pose_mode = 0x01;	
 		move_start_pos(comtrl);
+		usRegBuf[STEP_ENGINE_START_POS_MS] = 0x0;	
 	}
 }
 

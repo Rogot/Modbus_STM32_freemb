@@ -111,7 +111,7 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 	if(htim->Instance == TIM2)
 	{
     	if(step_engine.mode == SPEEDUP){
-    		if (!step_engine.manual_mode) {
+    		if (!step_engine.manual_mode || step_engine.start_pose_mode) {
 					TIM2->CCR1 = TIM2->CNT + step_engine.dir * step_engine.runCNT;
 					step_engine.mode = RUN;
 				} else {

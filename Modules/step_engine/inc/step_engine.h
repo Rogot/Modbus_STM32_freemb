@@ -41,6 +41,7 @@ typedef struct step_engine {
 	uint32_t slowdownCNT;
 	int16_t cnt;
 	uint8_t manual_mode;
+	uint8_t start_pose_mode;
 	uint8_t manual_move_right;
 	uint8_t manual_move_left;
 } t_step_engine;
