@@ -99,11 +99,11 @@ void munual_mode(t_control* comtrl) {
 	//if (comtrl->current_vel >= 0x04 && comtrl->current_pos >= 1) {
 		comtrl->dev->step_engine->manual_mode = 0x01;
 		if (comtrl->dev->step_engine->manual_move_left) {
-			move_step_engine(comtrl->dev->step_engine, comtrl->current_pos * 100, (float)(
+			move_step_engine(comtrl->dev->step_engine, 0, (float)(
 										(float)comtrl->current_vel / (float)2550));
 		}
 		else if (comtrl->dev->step_engine->manual_move_right) {
-			move_step_engine(comtrl->dev->step_engine, -(comtrl->current_pos * 100), (float)(
+			move_step_engine(comtrl->dev->step_engine, 0, (float)(
 										(float)comtrl->current_vel / (float)2550));
 		}
 	//}

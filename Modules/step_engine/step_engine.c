@@ -62,12 +62,12 @@ void move_step_engine(t_step_engine* step_eng, int16_t pos, float vel) {
 	
 	char* temp = (char*)(&((*step_eng).cnt));
 	
-	if ((*step_eng).cnt < 0) {
+	if ((*step_eng).cnt < 0 || (*step_eng).manual_move_right) {
 		(*step_eng).cnt = -((*step_eng).cnt);
 		(*step_eng).dir = -1;
 		TIM2->CR1|=TIM_CR1_DIR;
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
-	} else {
+	} else if ((*step_eng).cnt >= 0 || (*step_eng).manual_move_left) {
 		(*step_eng).dir = 1;
 		TIM2->CR1&=~(TIM_CR1_DIR);
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
@@ -83,6 +83,8 @@ void move_step_engine(t_step_engine* step_eng, int16_t pos, float vel) {
 		 (*step_eng).slowdownCNT = (*step_eng).cur_accel_size;
 	 } else {
 		 (*step_eng).runCNT = 0;
+		 (*step_eng).speedupCNT = (*step_eng).cur_accel_size;
+		 (*step_eng).slowdownCNT = (*step_eng).cur_accel_size;
 	 }
 	 
 	 if ((*step_eng).speedupCNT != (*step_eng).slowdownCNT) {
@@ -113,7 +115,7 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 					TIM2->CCR1 = TIM2->CNT + step_engine.dir * step_engine.runCNT;
 					step_engine.mode = RUN;
 				} else {
-					TIM2->CCR1 = TIM2->CNT + step_engine.dir * 3000;
+					TIM2->CCR1 = TIM2->CNT + step_engine.dir * 10;
 					if (!step_engine.manual_move_left && !step_engine.manual_move_right) {
 						step_engine.mode = RUN;
 					}
