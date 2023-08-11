@@ -95,6 +95,9 @@ void munual_mode(t_control* comtrl);
 void init_HMI(t_control* comtrl);
 void refresh_prog_parameters_FLASH(t_control* comtrl);
 void move_start_pos(t_control* comtrl);
+
+void search_home();
+
 void eHMIPoll();
 
 #endif //!HMI_INTERFACE_H

@@ -9,6 +9,8 @@ eMBEventType    eEvent;
 extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim3;
 extern DMA_HandleTypeDef hdma_tim1_ch4_trig_com;
+
+extern uint8_t is_start_pos;
 /* VARIABLES END */
 
 /*
@@ -150,7 +152,10 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 					step_engine.engine_TIM_slave->Instance->CCR1 = step_engine.engine_TIM_slave->Instance->CNT 
 																						+ step_engine.dir * step_engine.runCNT;
 					step_engine.mode = RUN;
-				} else {
+				} else if (is_start_pos) {
+					TIM2->CCR1 = 2147483647;
+					step_engine.mode = RUN;
+				}	else {
 					step_engine.engine_TIM_slave->Instance->CCR1 = step_engine.engine_TIM_slave->Instance->CNT
 													+ step_engine.dir * 10;
 					

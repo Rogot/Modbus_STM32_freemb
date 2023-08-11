@@ -4,6 +4,7 @@
 t_hmi_reg programs[MAX_PRGRMS_NUM];
 t_control ctrl;
 extern t_step_engine step_engine;
+extern uint8_t is_start_pos;
 t_hmi_reg* current_program;
 
 /*
@@ -246,4 +247,27 @@ void init_HMI(t_control* comtrl) {
 	*/
 	
 	read_program(current_program, 0);
+}
+
+
+/*
+* @bref: search start position - "0" via end cap
+* @param comtrl - all parameters for controlling by HMI
+*/
+void search_home(t_control* comtrl) {
+	while(!is_start_pos) {
+		move_step_engine(comtrl->dev->step_engine, 
+					2, (float)((float)50 / (float)2550));
+	}
+	step_engine.engine_TIM_slave->Instance->CCR1 = step_engine.engine_TIM_slave->Instance->CNT 
+								+ step_engine.dir * step_engine.slowdownCNT;
+	step_engine.mode = SLOWDOWN;
+				
+	HAL_DMA_Start_IT(step_engine.engine_TIM_master->hdma[TIM_DMA_ID_UPDATE], 
+				(uint32_t)(step_engine.slowdownbuf 
+								+ step_engine.accel_size - step_engine.slowdownCNT),
+				(uint32_t)&step_engine.engine_TIM_master->Instance->ARR, step_engine.slowdownCNT);
+				
+	__HAL_TIM_ENABLE_DMA(step_engine.engine_TIM_master, TIM_DMA_UPDATE);
+	
 }

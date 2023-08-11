@@ -68,10 +68,13 @@ extern uint16_t rx_data[256];
 extern uint8_t rx_data_indx;
 extern uint16_t in_count;
 
+uint8_t is_start_pos = 0x0;
+
+/* TEST */
 extern int32_t step_count;
 extern float vel_val;
 extern size_t accel_size;
-
+/* TEST */
 
 
 static USHORT usRegHoldingStart = REG_HOLDING_START;
@@ -208,6 +211,10 @@ int main(void)
 	#endif
 	eMBEventType    eEvent;
 	uint8_t count = 0;
+	
+	
+	search_home(&ctrl);
+	is_start_pos = 0x00;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -558,10 +565,7 @@ static void MX_GPIO_Init(void)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
-	if (usRegHoldingBuf[STEP_ENGINE_VEL_MC] > 0x1000){
-		usRegHoldingBuf[STEP_ENGINE_VEL_MC] = 0x00;
-	}
-	usRegHoldingBuf[STEP_ENGINE_VEL_MC]++;
+	is_start_pos = 0x01;
 }
 
 eMBErrorCode eMBRegInputCB(UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNRegs)
