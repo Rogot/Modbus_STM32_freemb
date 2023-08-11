@@ -10,7 +10,7 @@
 #define BASE_PROGRAM_ADDRESS					0x0800C000
 #define STEPS_NUM 										3
 
-#define MAX_VEL_PROG									50
+#define MAX_VEL_PROG									500000
 
 #define PEREPH_ENABLE									( 1 )
 

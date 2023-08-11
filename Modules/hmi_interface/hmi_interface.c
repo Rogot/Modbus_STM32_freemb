@@ -82,7 +82,7 @@ void execute_program(t_control* comtrl) {
 					}
 					move_step_engine(comtrl->dev->step_engine, 
 						calc_steps(comtrl->programms[comtrl->exe_prog].moving[i]), (float)(
-						(float)comtrl->programms[comtrl->exe_prog].vel[i] / (float)2550));
+						(float)comtrl->programms[comtrl->exe_prog].vel[i] / BASE_FREQ / ANFLE_ONE_STEP * 2 ));
 				//while(comtrl->dev->step_engine->mode != STOP);
 				}
 			}				

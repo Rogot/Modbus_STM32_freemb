@@ -189,8 +189,8 @@ int main(void)
 	usRegHoldingBuf[STEP_ENGINE_VEL_MC] = 0x30;
 	usRegHoldingBuf[STEP_ENGINE_START_POS_MS] = 0x51;
 	
-	usRegHoldingBuf[STAGE_1_POS] = 360;
-	usRegHoldingBuf[STAGE_1_VEL] = 20;
+	usRegHoldingBuf[STAGE_1_POS] = 3600;
+	usRegHoldingBuf[STAGE_1_VEL] = 360;
 	init_HMI(&ctrl);
 	#endif
 	
@@ -213,8 +213,8 @@ int main(void)
 	uint8_t count = 0;
 	
 	
-	search_home(&ctrl);
-	is_start_pos = 0x00;
+	//search_home(&ctrl);
+//	is_start_pos = 0x00;
   /* USER CODE END 2 */
 
   /* Infinite loop */

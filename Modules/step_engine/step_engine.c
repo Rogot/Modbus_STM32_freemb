@@ -58,7 +58,7 @@ void init_step_engine(t_step_engine* step_eng) {
 * @res - num of steps
 */
 int16_t calc_steps(int16_t pos) {
-		return pos / ANFLE_ONE_STEP * 2;
+		return pos / ANFLE_ONE_STEP * TOGGLE_DIVIDER;
 }
 
 int32_t step_count;
@@ -128,19 +128,28 @@ void move_step_engine(t_step_engine* step_eng, int16_t pos, float vel) {
 			//xMBPortEventGet(&eEvent);
 	 //}
 	 
-	 (*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT
-												+ step_engine.dir * step_engine.speedupCNT;
-	 
-	 HAL_DMA_Start_IT((*step_eng).engine_TIM_master->hdma[TIM_DMA_ID_UPDATE], 
-					(uint32_t)step_engine.speedupbuf, 
-					(uint32_t)&(*step_eng).engine_TIM_master->Instance->ARR, 
-		step_engine.speedupCNT);
-		
-	 __HAL_TIM_ENABLE_DMA((*step_eng).engine_TIM_master, TIM_DMA_UPDATE);
-		
-	 step_engine.mode=SPEEDUP;
-	 
-	 HAL_TIM_OC_Start((*step_eng).engine_TIM_master, TIM_CHANNEL_3);
+	 if ((*step_eng).speedupCNT == 0x0) {
+			TIM3->ARR = 1 / (*step_eng).vel;
+		 step_engine.engine_TIM_slave->Instance->CCR1 = step_engine.engine_TIM_slave->Instance->CNT 
+																						+ step_engine.dir * step_engine.runCNT;
+		 step_engine.mode = RUN;
+		 HAL_TIM_OC_Start((*step_eng).engine_TIM_master, TIM_CHANNEL_3);
+	 } else {
+		 
+		 (*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT
+													+ step_engine.dir * step_engine.speedupCNT;
+		 
+		 HAL_DMA_Start_IT((*step_eng).engine_TIM_master->hdma[TIM_DMA_ID_UPDATE], 
+						(uint32_t)step_engine.speedupbuf, 
+						(uint32_t)&(*step_eng).engine_TIM_master->Instance->ARR, 
+			step_engine.speedupCNT);
+			
+		 __HAL_TIM_ENABLE_DMA((*step_eng).engine_TIM_master, TIM_DMA_UPDATE);
+			
+		 step_engine.mode=SPEEDUP;
+		 
+		 HAL_TIM_OC_Start((*step_eng).engine_TIM_master, TIM_CHANNEL_3);
+	 }
 }
 
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
@@ -163,19 +172,27 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 						step_engine.mode = RUN;
 					}
 				}
+				TIM3->ARR = (uint16_t) 1 / step_engine.vel;
     	}
     	else
     	if(step_engine.mode == RUN){
-    		step_engine.engine_TIM_slave->Instance->CCR1 = step_engine.engine_TIM_slave->Instance->CNT 
-								+ step_engine.dir * step_engine.slowdownCNT;
-				step_engine.mode = SLOWDOWN;
 				
-				HAL_DMA_Start_IT(step_engine.engine_TIM_master->hdma[TIM_DMA_ID_UPDATE], 
-				(uint32_t)(step_engine.slowdownbuf 
-								+ step_engine.accel_size - step_engine.slowdownCNT),
-				(uint32_t)&step_engine.engine_TIM_master->Instance->ARR, step_engine.slowdownCNT);
-				
-				__HAL_TIM_ENABLE_DMA(step_engine.engine_TIM_master, TIM_DMA_UPDATE);
+				if (step_engine.slowdownCNT != 0){
+					step_engine.engine_TIM_slave->Instance->CCR1 = step_engine.engine_TIM_slave->Instance->CNT 
+									+ step_engine.dir * step_engine.slowdownCNT;
+					step_engine.mode = SLOWDOWN;
+					
+					HAL_DMA_Start_IT(step_engine.engine_TIM_master->hdma[TIM_DMA_ID_UPDATE], 
+					(uint32_t)(step_engine.slowdownbuf 
+									+ step_engine.accel_size - step_engine.slowdownCNT),
+					(uint32_t)&step_engine.engine_TIM_master->Instance->ARR, step_engine.slowdownCNT);
+					
+					__HAL_TIM_ENABLE_DMA(step_engine.engine_TIM_master, TIM_DMA_UPDATE);
+				} else {
+					HAL_TIM_OC_Stop(step_engine.engine_TIM_master, TIM_CHANNEL_3);
+					step_engine.mode = STOP;
+					HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_SET);
+				}
 			}
     	else
     	if(step_engine.mode == SLOWDOWN){

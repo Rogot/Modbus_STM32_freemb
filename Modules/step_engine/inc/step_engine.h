@@ -21,6 +21,7 @@
 #define SPEED_MAX 									0.1
 
 #define ANFLE_ONE_STEP							0.9
+#define TOGGLE_DIVIDER							2
 
 #define STOP 1
 #define SPEEDUP 2
