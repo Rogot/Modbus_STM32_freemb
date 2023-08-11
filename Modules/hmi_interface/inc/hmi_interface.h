@@ -10,6 +10,8 @@
 #define BASE_PROGRAM_ADDRESS					0x0800C000
 #define STEPS_NUM 										3
 
+#define MAX_VEL_PROG									50
+
 #define PEREPH_ENABLE									( 1 )
 
 #define STAGE_NUM											( 3 )
@@ -56,6 +58,8 @@
 
 /* REGISTERS DEFINES END */
 
+#define START_POS_LOCALITY					( 48 )
+
 typedef struct HMI_REGISTERS {
 	uint16_t mixing_speed;
 	uint16_t mixing_time;
@@ -86,6 +90,7 @@ uint8_t write_program(t_hmi_reg* prog, uint16_t num);
 void read_program(t_hmi_reg* program, uint8_t num);
 void execute_program(t_control* comtrl);
 void refresh_reg(t_control* comtrl, int* usRegBuf);
+void load_prog_FLASH(t_control* comtrl);
 void munual_mode(t_control* comtrl);
 void init_HMI(t_control* comtrl);
 void refresh_prog_parameters_FLASH(t_control* comtrl);

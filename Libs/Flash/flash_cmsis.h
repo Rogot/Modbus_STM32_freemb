@@ -3,7 +3,7 @@
 
 #include <stm32f405xx.h>
 
-#define FLASH_ENABLE		 ( 0 )
+#define FLASH_ENABLE		 ( 1 )
 
 #define FLASH_KEY1			 0x45670123
 #define FLASH_KEY2			 0xCDEF89AB

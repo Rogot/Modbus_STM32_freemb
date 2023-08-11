@@ -159,9 +159,6 @@ eMBRTUReceive( UCHAR * pucRcvAddress, UCHAR ** pucFrame, USHORT * pusLength )
     if( ( usRcvBufferPos >= MB_SER_PDU_SIZE_MIN )
         && ( usMBCRC16( ( UCHAR * ) ucRTUBuf, usRcvBufferPos ) == 0 ) )
     {
-				/*
-				* If 
-				*/
 			
         /* Save the address field. All frames are passed to the upper layed
          * and the decision if a frame is used is done there.
@@ -177,7 +174,7 @@ eMBRTUReceive( UCHAR * pucRcvAddress, UCHAR ** pucFrame, USHORT * pusLength )
 					/* Return the start of the Modbus PDU to the caller. */
 					*pucFrame = ( UCHAR * ) & ucRTUBuf[MB_SER_PDU_PDU_OFF];
 				} else {
-					*pucRcvAddress = ucRTUBuf[0x1];
+					*pucRcvAddress = ucRTUBuf[1];
 					*pusLength = ( USHORT )( usRcvBufferPos - MB_SER_PDU_PDU_OFF - 1);
 					/* Return the start of the Modbus PDU to the caller. */
 					*pucFrame = ( UCHAR * ) & ucRTUBuf[0x2];

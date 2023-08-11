@@ -24,8 +24,6 @@
 #include "mb.h"
 #include "mbport.h"
 #include "mt_port.h"
-//#include "flash_cmsis.h"
-//#include "step_engine.h"
 #include "hmi_interface.h"
 
 
@@ -69,8 +67,11 @@ extern t_modbus_him_pack txData;
 extern uint16_t rx_data[256];
 extern uint8_t rx_data_indx;
 extern uint16_t in_count;
-//static uint16_t  rx_data[256];
-//static uint8_t rx_data_indx = 0;
+
+extern int32_t step_count;
+extern float vel_val;
+extern size_t accel_size;
+
 
 
 static USHORT usRegHoldingStart = REG_HOLDING_START;
@@ -180,28 +181,14 @@ int main(void)
 	dev.step_engine = &step_engine;
 	
 	ctrl.dev = &dev;
-	ctrl.programms = &(*programs);
+	ctrl.programms = programs;
 	usRegHoldingBuf[NUM_EXE_PROGRAM] = 0x01;
+	usRegHoldingBuf[STEP_ENGINE_VEL_MC] = 0x30;
+	usRegHoldingBuf[STEP_ENGINE_START_POS_MS] = 0x51;
+	
+	usRegHoldingBuf[STAGE_1_POS] = 360;
+	usRegHoldingBuf[STAGE_1_VEL] = 20;
 	init_HMI(&ctrl);
-	#endif
-	
-	#if FLASH_ENABLE
-	uint8_t data[8] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08};
-	uint32_t temp[2] = {0x0};
-	
-	CMSIS_flash_allow_access();
-	CMSIS_internal_flash_erase(FLASH_SNB_SEC_3);
-	
-	for (uint8_t i = 0; i < 2; i++) {
-		temp[i] = CMSIS_internal_flash_read(0x0800C000 + i * 4);
-	}
-	
-	CMSIS_internal_flash_write(data, 0x0800C000, 8); 
-	CMSIS_internal_flash_read(0x0800C000);
-	
-	for (uint8_t i = 0; i < 2; i++) {
-		temp[i] = CMSIS_internal_flash_read(0x0800C000 + i * 4);
-	}
 	#endif
 	
 	#if STEP_ENGINE_ENABLE
@@ -210,11 +197,12 @@ int main(void)
 	//DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_TIM3_STOP;
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_SET);
 	
-	
 	step_engine.mode = STOP;
 	step_engine.vel = SPEED_MIN;
 	step_engine.accel_size = 0;
 	step_engine.dir = 1;
+	step_engine.engine_TIM_master = &htim3;
+	step_engine.engine_TIM_slave = &htim2;
 	
 	init_step_engine(&step_engine);
 	#endif
@@ -570,22 +558,10 @@ static void MX_GPIO_Init(void)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
- if((GPIO_Pin== GPIO_PIN_1) && (step_engine.mode == STOP) && (usRegHoldingBuf[1] == 0)) {
-	 if(step_engine.dir == 1){
-		 step_engine.dir = -1;
-		 TIM2->CR1 |= TIM_CR1_DIR;
-		 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
-	 }
-	 else {
-		 step_engine.dir = 1;
-		 TIM2->CR1 &= ~(TIM_CR1_DIR);
-		 HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
-	 }
-	 //usRegHoldingBuf[1] = 0x01;
-	 start = 1;
-   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_RESET);
-
- }
+	if (usRegHoldingBuf[STEP_ENGINE_VEL_MC] > 0x1000){
+		usRegHoldingBuf[STEP_ENGINE_VEL_MC] = 0x00;
+	}
+	usRegHoldingBuf[STEP_ENGINE_VEL_MC]++;
 }
 
 eMBErrorCode eMBRegInputCB(UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNRegs)

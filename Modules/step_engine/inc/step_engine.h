@@ -11,14 +11,16 @@
 #define STEP_ENGINE_ENABLE		 			( 1 )
 #define STEP_ENGINE_TEST_ENABLE		  ( 0 )
 
-#define BASE_FREQ 1e+5
-#define ACCEL_TIME_SEC 1.0
-#define DECEL_TIME_SEC 1.0
-#define ACCEL_TIME (ACCEL_TIME_SEC*BASE_FREQ)
-#define DECEL_TIME DECEL_TIME_SEC*BASE_FREQ
-#define ACCEL 0.000000001	
-#define SPEED_MIN 10.0/65535
-#define SPEED_MAX 0.1
+#define BASE_FREQ 									1e+5
+#define ACCEL_TIME_SEC 							1.0
+#define DECEL_TIME_SEC 							1.0
+#define ACCEL_TIME 							  	(ACCEL_TIME_SEC*BASE_FREQ)
+#define DECEL_TIME 									DECEL_TIME_SEC*BASE_FREQ
+#define ACCEL 											0.000000001	
+#define SPEED_MIN								  	10.0/65535
+#define SPEED_MAX 									0.1
+
+#define ANFLE_ONE_STEP							0.9
 
 #define STOP 1
 #define SPEEDUP 2
@@ -44,12 +46,16 @@ typedef struct step_engine {
 	uint8_t start_pose_mode;
 	uint8_t manual_move_right;
 	uint8_t manual_move_left;
+	TIM_HandleTypeDef* engine_TIM_master; //TIM3
+	TIM_HandleTypeDef* engine_TIM_slave; //TIM2
 } t_step_engine;
 
 void init_step_engine(t_step_engine* step_eng);
 void led_init(); /* LED-pin init */
 
 void move_step_engine(t_step_engine* step_eng, int16_t pos, float vel);
+
+int16_t calc_steps(int16_t pos);
 
 inline float mysqrt(float value);
 

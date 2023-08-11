@@ -7,8 +7,9 @@ extern t_step_engine step_engine;
 t_hmi_reg* current_program;
 
 /*
-* @bref: prog - programm parameters 
-				 num - number of saved programs
+* @bref: write prigram from FLASH
+* @param prog - programm parameters 
+* @param num - number of saved programs
 */
 
 uint8_t write_program(t_hmi_reg* prog, uint16_t num){
@@ -34,8 +35,9 @@ uint8_t write_program(t_hmi_reg* prog, uint16_t num){
 }
 
 /*
-* @bref: program - programm parameters;
-				 num - number of the program read
+* @bref: read prigram from FLASH
+* @param program - programm parameters;
+* @param num - number of the program read
 */
 
 void read_program(t_hmi_reg* program, uint8_t num) {
@@ -49,11 +51,12 @@ void read_program(t_hmi_reg* program, uint8_t num) {
 	
 	temp_program = (t_hmi_reg*)&(*(temp));
 	
-	memcpy(program, temp_program, (sizeof(t_hmi_reg)));
+	memcpy(&program[num], temp_program, (sizeof(t_hmi_reg)));
 }
 
 /*
-* @bref: comtrl - all parameters for controlling by HMI
+* @bref: execute storage program
+* @param (comtrl) - all parameters for controlling by HMI
 */
 void execute_program(t_control* comtrl) {
 	
@@ -72,17 +75,23 @@ void execute_program(t_control* comtrl) {
 		#if !STEP_ENGINE_TEST_ENABLE
 			//read_program(comtrl->programms, comtrl->exe_prog);
 			for (uint8_t i = 0; i < STAGE_NUM; i++) {
-				move_step_engine(comtrl->dev->step_engine, 
-					comtrl->programms[comtrl->exe_prog].moving[i] * 100, (float)(
-					(float)comtrl->programms[comtrl->exe_prog].vel[i] / (float)2550));
-				while(comtrl->dev->step_engine->mode != STOP);
-			}	
+				if (comtrl->programms[comtrl->exe_prog].vel[i] != 0x00) {
+					if (comtrl->programms[comtrl->exe_prog].vel[i] > MAX_VEL_PROG) {
+						comtrl->programms[comtrl->exe_prog].vel[i] = MAX_VEL_PROG;
+					}
+					move_step_engine(comtrl->dev->step_engine, 
+						calc_steps(comtrl->programms[comtrl->exe_prog].moving[i]), (float)(
+						(float)comtrl->programms[comtrl->exe_prog].vel[i] / (float)2550));
+				//while(comtrl->dev->step_engine->mode != STOP);
+				}
+			}				
 		#endif
 	#endif
 }
 
 /*
-* @bref: comtrl - all parameters for controlling by HMI
+* @bref: save struct data in FLASH
+*	@param (comtrl) - all parameters for controlling by HMI
 */
 
 void refresh_prog_parameters_FLASH(t_control* comtrl) {
@@ -93,74 +102,102 @@ void refresh_prog_parameters_FLASH(t_control* comtrl) {
 		read_program(comtrl->programms, i);
 	} 
 }
-	
+
+/*
+* @bref: only load program from FLASH without write
+*	@param (comtrl) - all parameters for controlling by HMI
+*/
+
+void load_prog_FLASH(t_control* comtrl) {
+	for (uint8_t i = 0; i < MAX_PRGRMS_NUM; i++) {
+		read_program(comtrl->programms, i);
+	}
+}
+
+/*
+* @bref: manual mode control function
+*	@param (comtrl) - all parameters for controlling by HMI
+*/
 void munual_mode(t_control* comtrl) {
-	#if !STEP_ENGINE_TEST_ENABLE
-	//if (comtrl->current_vel >= 0x04 && comtrl->current_pos >= 1) {
 		comtrl->dev->step_engine->manual_mode = 0x01;
+	if (comtrl->current_vel != 0x00) {
 		if (comtrl->dev->step_engine->manual_move_left) {
-			move_step_engine(comtrl->dev->step_engine, 0, (float)(
+			move_step_engine(comtrl->dev->step_engine, 2, (float)(
 										(float)comtrl->current_vel / (float)2550));
 		}
 		else if (comtrl->dev->step_engine->manual_move_right) {
-			move_step_engine(comtrl->dev->step_engine, 0, (float)(
+			move_step_engine(comtrl->dev->step_engine, -2, (float)(
 										(float)comtrl->current_vel / (float)2550));
 		}
-	//}
-	#endif
+	}
 }
 
+/*
+* @bref: "home" position of coordinate
+*	@param (comtrl) - all parameters for controlling by HMI
+*/
 void move_start_pos(t_control* comtrl) {
 	int32_t start_pos = 2147483647;
 	int32_t cur_pos = TIM2->CCR1;
 	
 	int32_t res = (int16_t)start_pos - (int16_t )cur_pos;
 	
-	if (res > 48 || res < -48) {
-	
-	move_step_engine(comtrl->dev->step_engine, (int16_t )(res), (float)(
-									(float)comtrl->current_vel / (float)2550));
+	if ((res > START_POS_LOCALITY || res < -START_POS_LOCALITY)
+				&& comtrl->current_vel != 0x0) {
+		move_step_engine(comtrl->dev->step_engine, (int16_t )(res), (float)(
+							(float)comtrl->current_vel / (float)2550));
 	}
 }
 
-
+/*
+* @bref: "home" position of coordinate
+*	@param (comtrl) - all parameters for controlling by HMI
+*	@param (usRegBuf) - MODBUS array
+*/
 void eHMIPoll(t_control* comtrl, int* usRegBuf) {
 	refresh_reg(comtrl, usRegBuf);
+	
+	#if STEP_ENGINE_ENABLE
 	if( comtrl->is_manual == 0x01 && comtrl->is_launch == 0x00
 				&& comtrl->dev->step_engine->mode == STOP){
 		comtrl->is_manual = 0x00;
 		comtrl->dev->step_engine->start_pose_mode = 0x00;			
 		munual_mode(comtrl);		
 	}
-	if(comtrl->is_manual == 0x00 && comtrl->is_launch == 0x01 
+	else if(comtrl->is_manual == 0x00 && comtrl->is_launch == 0x01 
 			&& comtrl->dev->step_engine->mode == STOP){
 		execute_program(comtrl);
-		//comtrl->is_launch = 0x00; 
+		comtrl->is_launch = 0x00; 
 		usRegBuf[LAUNCH_PROGRAM] = 0x0;
 	}
-	if (comtrl->save_prog != 0) {
-		refresh_prog_parameters_FLASH(comtrl);
-	}
+	
 	if (comtrl->start_pos_step_engine == 0x01 
 			&& comtrl->dev->step_engine->mode == STOP) {
 		comtrl->dev->step_engine->start_pose_mode = 0x01;	
 		move_start_pos(comtrl);
 		usRegBuf[STEP_ENGINE_START_POS_MS] = 0x0;	
 	}
+	#endif
+			
+	#if FLASH_ENABLE
+	if (comtrl->save_prog != 0) {
+		usRegBuf[SAVE_PROGRAM] = 0x0;
+		refresh_prog_parameters_FLASH(comtrl);
+	}
+	#endif
 }
 
 /*
-* @bref: comtrl - all parameters for controlling by HMI
-				 usRegBuf - MODBUS buffer pointer
+* @bref: function for refresh struct parameters for HMI
+* @param comtrl - all parameters for controlling by HMI
+* @param usRegBuf - MODBUS buffer pointer
 */
 void refresh_reg(t_control* comtrl, int* usRegBuf) {
 	
-	if (comtrl->is_launch == 0x01){
+	if (comtrl->dev->step_engine->mode != STOP){
 		usRegBuf[LAUNCH_PROGRAM] = 0x0;
 	}
-	uint8_t num_prog = usRegBuf[NUM_EXE_PROGRAM] - 1;
 	
-	comtrl->exe_prog = num_prog;
 	comtrl->save_prog = usRegBuf[SAVE_PROGRAM];
 	comtrl->start_pos_step_engine = usRegBuf[STEP_ENGINE_START_POS_MS];
 	
@@ -170,13 +207,15 @@ void refresh_reg(t_control* comtrl, int* usRegBuf) {
 	comtrl->current_vel = usRegBuf[STEP_ENGINE_VEL_MC];
 	comtrl->current_pos = usRegBuf[STEP_ENGINE_POS_MC];
 	
-	comtrl->programms[num_prog].vel[0] = usRegBuf[STAGE_1_VEL];
-	comtrl->programms[num_prog].vel[1] = usRegBuf[STAGE_2_VEL];
-	comtrl->programms[num_prog].vel[2] = usRegBuf[STAGE_3_VEL];
+	comtrl->programms[comtrl->exe_prog].vel[0] = usRegBuf[STAGE_1_VEL];
+	comtrl->programms[comtrl->exe_prog].vel[1] = usRegBuf[STAGE_2_VEL];
+	comtrl->programms[comtrl->exe_prog].vel[2] = usRegBuf[STAGE_3_VEL];
 
-	comtrl->programms[num_prog].moving[0] = (int16_t)usRegBuf[STAGE_1_POS];
-	comtrl->programms[num_prog].moving[1] = (int16_t)usRegBuf[STAGE_2_POS];
-	comtrl->programms[num_prog].moving[2] = (int16_t)usRegBuf[STAGE_3_POS];
+	comtrl->programms[comtrl->exe_prog].moving[0] = (int16_t)usRegBuf[STAGE_1_POS];
+	comtrl->programms[comtrl->exe_prog].moving[1] = (int16_t)usRegBuf[STAGE_2_POS];
+	comtrl->programms[comtrl->exe_prog].moving[2] = (int16_t)usRegBuf[STAGE_3_POS];
+	
+	comtrl->exe_prog = usRegBuf[NUM_EXE_PROGRAM] - 1;
 	
 	comtrl->dev->step_engine->manual_move_left = (uint8_t)usRegBuf[STEP_ENGINE_MOVE_LEFT];
 	comtrl->dev->step_engine->manual_move_right = (uint8_t)usRegBuf[STEP_ENGINE_MOVE_RIGHT];
@@ -184,9 +223,11 @@ void refresh_reg(t_control* comtrl, int* usRegBuf) {
 }
 
 /*
-* @bref: comtrl - all parameters for controlling by HMI
+* @bref: inital function for HMI
+* @param comtrl - all parameters for controlling by HMI
 */
 void init_HMI(t_control* comtrl) {
+/*
 	comtrl->programms[0].mixing_speed = 0x33;
 	comtrl->programms[0].mixing_time= 0x34;
 	comtrl->programms[0].vacuum_time = 0x35;
@@ -202,8 +243,7 @@ void init_HMI(t_control* comtrl) {
 	comtrl->programms[1].mixing_time= 0x24;
 	comtrl->programms[1].vacuum_time = 0x25;
 	comtrl->programms[1].air_pubping_lvl = 0x26;
-	
-	//write_program(programs, 1);
+	*/
 	
 	read_program(current_program, 0);
 }
