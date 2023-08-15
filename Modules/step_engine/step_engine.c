@@ -78,8 +78,12 @@ void move_step_engine(t_step_engine* step_eng, int16_t pos, float vel) {
 	//(*step_eng).cnt = (int16_t)(pos - TIM3->CNT);
 	step_count = (int16_t)(*step_eng).cnt;
 	
-	(*step_eng).vel = vel;
-	vel_val = vel;
+	if (vel < SPEED_MIN) { 
+		(*step_eng).vel = SPEED_MIN;
+	} else {
+		(*step_eng).vel = vel;
+	}
+	vel_val = (*step_eng).vel;
 	
 	if ((*step_eng).cnt < 0 || (*step_eng).manual_move_right) {
 		(*step_eng).cnt = -((*step_eng).cnt);

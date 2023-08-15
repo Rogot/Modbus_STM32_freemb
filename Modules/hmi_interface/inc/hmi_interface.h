@@ -5,6 +5,7 @@
 #include "flash_cmsis.h"
 #include "step_engine.h"
 #include <string.h>
+#include "dac_cmsis.h"
 
 #define MAX_PRGRMS_NUM								10
 #define BASE_PROGRAM_ADDRESS					0x0800C000
@@ -12,7 +13,7 @@
 
 #define MAX_VEL_PROG									500000
 
-#define PEREPH_ENABLE									( 1 )
+#define PEREPH_ENABLE									( 0 )
 
 #define STAGE_NUM											( 3 )
 
