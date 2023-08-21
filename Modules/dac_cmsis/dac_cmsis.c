@@ -1,6 +1,6 @@
 #include "dac_cmsis.h"
 
-void dac_init(t_dac* dac) {
+void CMSIS_DAC_init(t_dac* dac) {
 	
 	TIM_init(dac->tim, dac->tim_presc, dac->tim_arr);
 	

@@ -126,7 +126,7 @@ xMBPortSerialGetByte( CHAR * pucByte )
  * a new character can be sent. The protocol stack will then call 
  * xMBPortSerialPutByte( ) to send the character.
  */
-static uint8_t uiCnt = 0;
+
 static void prvvUARTTxReadyISR( void )
 {
     pxMBFrameCBTransmitterEmpty(  );
@@ -143,6 +143,7 @@ static void prvvUARTRxISR( void )
 }
 
 /* --------------------------------------------------------------------------*/
+#if MODBUS_ENABLE
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
   if (huart->Instance == modbusUart->Instance)
@@ -152,6 +153,8 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 	}
 }
 /* --------------------------------------------------------------------------*/
+
+
 
 extern volatile UCHAR  ucRTUBuf[];
 
@@ -173,4 +176,5 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 		#endif
   }
 }
+#endif
 /* --------------------------------------------------------------------------*/

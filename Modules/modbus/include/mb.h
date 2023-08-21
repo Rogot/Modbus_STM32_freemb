@@ -70,6 +70,8 @@ PR_BEGIN_EXTERN_C
 /*! \ingroup modbus
  * \brief Use the default Modbus TCP port (502)
  */
+#define MODBUS_ENABLE					( 0 ) 
+ 
 #define MB_TCP_PORT_USE_DEFAULT 0   
 
 #define MB_HMI_PACKET_DATA_SIZE 248

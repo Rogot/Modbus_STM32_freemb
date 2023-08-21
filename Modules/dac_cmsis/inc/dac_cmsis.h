@@ -13,7 +13,7 @@ typedef struct DAC_CMSIS {
 	uint16_t tim_arr;
 } t_dac;
 
-void dac_init(t_dac* dac);
+void CMSIS_DAC_init(t_dac* dac);
 
 void TIM_init(TIM_TypeDef* tim, uint16_t psc, uint16_t arr);
 

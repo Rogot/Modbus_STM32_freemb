@@ -26,6 +26,9 @@
 #include "mt_port.h"
 #include "hmi_interface.h"
 
+#include "DWIN_lib.h"
+#include "DWIN_port.h"
+
 
 /* USER CODE END Includes */
 
@@ -36,8 +39,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define DATA_USART2_TX		( 0 )
-#define MODBUS_ENABLE			( 0 )
+#define DWIN_USART_ENABLE			( 1 )
+#define DATA_USART2_TX				( 0 )
 	
 /* USER CODE END PD */
 
@@ -52,7 +55,7 @@ ADC_HandleTypeDef hadc1;
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
-TIM_HandleTypeDef htim4;
+TIM_HandleTypeDef htim10;
 DMA_HandleTypeDef hdma_tim3_ch4_up;
 
 UART_HandleTypeDef huart1;
@@ -64,11 +67,21 @@ extern uint8_t start;
 extern uint8_t print;
 extern t_step_engine step_engine;
 
+#if MODBUS_ENABLE
 extern t_modbus_him_pack rxData;
 extern t_modbus_him_pack txData;
 
 extern uint16_t rx_data[256];
 extern uint8_t rx_data_indx;
+#endif
+
+static USHORT usRegHoldingStart = REG_HOLDING_START;
+static int usRegHoldingBuf[REG_HOLDING_NREGS] = { 0x0 };
+	
+static USHORT usRegInputStart = REG_INPUT_START;
+static USHORT usRegInputBuf[REG_INPUT_NREGS] = { 0x0 };
+
+extern volatile UCHAR  ucDWINBuf[DWIN_SER_PDU_SIZE_MAX];
 extern uint16_t in_count;
 t_dac dac;
 uint8_t is_start_pos = 0x0;
@@ -79,13 +92,6 @@ extern float vel_val;
 extern size_t accel_size;
 int value = 0;
 /* TEST */
-
-
-static USHORT usRegHoldingStart = REG_HOLDING_START;
-static int usRegHoldingBuf[REG_HOLDING_NREGS] = { 0x0 };
-	
-static USHORT usRegInputStart = REG_INPUT_START;
-static USHORT usRegInputBuf[REG_INPUT_NREGS] = { 0x0 };
 t_devices dev;
 
 /* USER CODE END PV */
@@ -97,9 +103,9 @@ static void MX_DMA_Init(void);
 static void MX_TIM3_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_TIM2_Init(void);
-static void MX_TIM4_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_TIM1_Init(void);
+static void MX_TIM10_Init(void);
 /* USER CODE BEGIN PFP */
 
 #if DATA_USART2_TX
@@ -136,7 +142,7 @@ void DataWrite(uint16_t data) {
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+uint16_t tepm[20];
 /* USER CODE END 0 */
 
 /**
@@ -171,13 +177,13 @@ int main(void)
   MX_TIM3_Init();
   MX_USART1_UART_Init();
   MX_TIM2_Init();
-  MX_TIM4_Init();
   MX_ADC1_Init();
   MX_TIM1_Init();
+  MX_TIM10_Init();
   /* USER CODE BEGIN 2 */
 	#if MODBUS_ENABLE
 	
-	MT_PORT_SetTimerModule(&htim4);
+	MT_PORT_SetTimerModule(&htim10);
 	MT_PORT_SetUartModule(&huart1);
 	
 	eMBErrorCode eStatus;
@@ -194,12 +200,14 @@ int main(void)
 	
 	ctrl.dev = &dev;
 	ctrl.programms = programs;
+	#if MODBUS_ENABLE
 	usRegHoldingBuf[NUM_EXE_PROGRAM] = 0x01;
 	usRegHoldingBuf[STEP_ENGINE_VEL_MC] = 0x30;
 	usRegHoldingBuf[STEP_ENGINE_START_POS_MS] = 0x51;
 	
 	usRegHoldingBuf[STAGE_1_POS] = 3600;
 	usRegHoldingBuf[STAGE_1_VEL] = 360;
+	#endif
 	init_HMI(&ctrl);
 	
 	#if STEP_ENGINE_ENABLE
@@ -226,8 +234,23 @@ int main(void)
 	dac.dac_type = DAC;
 	dac.tim_presc = 719;
 	dac.tim_arr = 10;
-	dac_init(&dac);
+	CMSIS_DAC_init(&dac);
 	uint16_t a;
+	#endif
+	
+	#if DWIN_SERIAL_PORT_ENABLE
+	DWIN_PORT_SetDMAModule(DMA2_Stream2);
+	DWIN_PORT_SetUartModule(&huart1);
+	CMSIS_DMA_Init(DMA2_Stream2);
+	//CMSIS_DMA_Config(DMA2_Stream2, &(USART1->DR), (uint32_t*)ucDWINBuf, 3);
+	
+	eDWINErrorCode eStatus;
+	eDWINInit(0x01, 0, 115200, DWIN_PAR_NONE); 
+	eStatus = eDWINEnable();
+	if (eStatus != DWIN_ENOERR)
+	{
+	// Error handling
+	}
 	#endif
 	
 	//search_home(&ctrl);
@@ -255,12 +278,17 @@ int main(void)
 			a++;
 			#endif
 		
-		
+			#if MODBUS_ENABLE
 			eHMIPoll(&ctrl, usRegHoldingBuf);
+			#endif
 		#endif
 		
 		#if MODBUS_ENABLE
 		eMBPoll();
+		#endif
+		
+		#if DWIN_SERIAL_PORT_ENABLE
+		eDWINPoll();
 		#endif
 		
     /* USER CODE END WHILE */
@@ -551,47 +579,33 @@ static void MX_TIM3_Init(void)
 }
 
 /**
-  * @brief TIM4 Initialization Function
+  * @brief TIM10 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_TIM4_Init(void)
+static void MX_TIM10_Init(void)
 {
 
-  /* USER CODE BEGIN TIM4_Init 0 */
+  /* USER CODE BEGIN TIM10_Init 0 */
 
-  /* USER CODE END TIM4_Init 0 */
+  /* USER CODE END TIM10_Init 0 */
 
-  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  /* USER CODE BEGIN TIM10_Init 1 */
 
-  /* USER CODE BEGIN TIM4_Init 1 */
-
-  /* USER CODE END TIM4_Init 1 */
-  htim4.Instance = TIM4;
-  htim4.Init.Prescaler = 71;
-  htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim4.Init.Period = 50;
-  htim4.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim4.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_Base_Init(&htim4) != HAL_OK)
+  /* USER CODE END TIM10_Init 1 */
+  htim10.Instance = TIM10;
+  htim10.Init.Prescaler = 71;
+  htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim10.Init.Period = 50;
+  htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim10.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim10) != HAL_OK)
   {
     Error_Handler();
   }
-  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
-  if (HAL_TIM_ConfigClockSource(&htim4, &sClockSourceConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim4, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM4_Init 2 */
+  /* USER CODE BEGIN TIM10_Init 2 */
 
-  /* USER CODE END TIM4_Init 2 */
+  /* USER CODE END TIM10_Init 2 */
 
 }
 
@@ -623,7 +637,9 @@ static void MX_USART1_UART_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USART1_Init 2 */
-
+	#if DWIN_SERIAL_PORT_ENABLE
+	USART1->CR3 |= USART_CR3_DMAR; //USART DMA recieve enable
+  #endif
   /* USER CODE END USART1_Init 2 */
 
 }
@@ -710,7 +726,6 @@ void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
 	if (hadc->Instance == ADC1) {
 		value = HAL_ADC_GetValue(&hadc1);
 		dac.dac_type->DHR12R1 = value;
-		//HAL_ADC_Stop_IT(&hadc1);
 	}
 }
 
