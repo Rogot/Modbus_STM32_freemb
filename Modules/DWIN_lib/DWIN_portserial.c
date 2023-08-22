@@ -6,6 +6,7 @@ static void UARTRxISR( void );
 
 /* ----------------------- Variables ----------------------------------------*/
 extern UART_HandleTypeDef* DWIN_uart;
+extern DMA_Stream_TypeDef* DWIN_dma;
 uint8_t DWIN_txByte = 0x00;
 uint8_t DWIN_rxByte = 0x00;
 
@@ -83,22 +84,21 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 /* --------------------------------------------------------------------------*/
 
 
-
 extern volatile UCHAR  ucDWINBuf[];
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
 	 if (huart->Instance == DWIN_uart->Instance)
 		{
-				CMSIS_DMA_Config(DMA2_Stream2, &(USART1->DR), (uint32_t*)ucDWINBuf, 3);
-				DWIN_uart->Instance->SR &= ~USART_SR_RXNE;				
+				CMSIS_DMA_Config(DWIN_dma, &(DWIN_uart->Instance->DR), (uint32_t*)ucDWINBuf, 3);
+				DWIN_uart->Instance->SR &= ~USART_SR_RXNE;
 				//xDWINPortEventPost(DWIN_EV_FRAME_RECEIVED);
 
 		}
 }
 #endif
 /* --------------------------------------------------------------------------*/
-
+//extern eDWINEventType xEvent;
 void DMA2_Stream2_IRQHandler(void)
 {
 	eDWINEventType xEvent;

@@ -20,6 +20,7 @@ typedef enum
 //extern t_modbus_him_pack rxData;
 DMA_Stream_TypeDef* DWIN_dma;
 UART_HandleTypeDef* DWIN_uart;
+extern eDWINEventType xEvent;
 
 static UCHAR    ucDWINAddress;
 static eDWINMode  eDWINCurrentMode;
@@ -107,16 +108,21 @@ eDWINReceive( UCHAR * pucRcvAddress, UCHAR ** pucFrame,
 		 case DWIN_EV_FRAME_RECEIVED:
 			if (ucDWINBuf[DWIN_START_POS] == DWIN_START_BIT) {
 				*pucRcvAddress = ucDWINBuf[DWIN_SLAVE_ID_POS];
-				HAL_UART_Receive_IT(DWIN_uart, (uint8_t*)(ucDWINBuf + 3), ucDWINBuf[DWIN_WORD_LENGTH_POS]);
-				CMSIS_DMA_Config(DWIN_dma, &(USART1->DR), (uint32_t*)(ucDWINBuf + 3), ucDWINBuf[DWIN_WORD_LENGTH_POS]);
-				xDWINPortEventGet(&eDWEvent);
-				xDWINPortEventPost( eType );
-				//xFrameReceived = TRUE;
+				CMSIS_DMA_Config(DWIN_dma, &(DWIN_uart->Instance->DR),
+												(uint32_t*)(ucDWINBuf + 3),
+												 ucDWINBuf[DWIN_WORD_LENGTH_POS]);
+				xFrameReceived = TRUE;
+			} else { 
+				//xDWINPortEventPost(DWIN_EV_READY);
+				//CMSIS_DMA_Config(DWIN_dma, &(USART1->DR), (uint32_t*)ucDWINBuf, 3);
 			}
 			break;
 		 case DWIN_EV_DATA_RECEIVED:
-				HAL_UART_Receive_IT(DWIN_uart, (uint8_t*)&ucDWINBuf, 3);
-				CMSIS_DMA_Config(DMA2_Stream2, NULL, NULL, 0);
+				CMSIS_DMA_Config(DWIN_dma, &(DWIN_uart->Instance->DR),
+												(uint32_t*)ucDWINBuf, 3);
+				(void) DWIN_uart->Instance->DR;
+				//DWIN_uart->Instance->CR1 |= USART_CR1_RXNEIE;
+				xDWINPortEventPost(DWIN_EV_READY);
 			 break;
 	 }
 	

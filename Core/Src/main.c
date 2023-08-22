@@ -142,6 +142,7 @@ void DataWrite(uint16_t data) {
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+//eDWINEventType xEvent;
 uint16_t tepm[20];
 /* USER CODE END 0 */
 

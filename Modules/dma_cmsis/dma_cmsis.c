@@ -28,7 +28,7 @@ void CMSIS_DMA_Init(DMA_Stream_TypeDef* dma_stream){
 }
 
 void CMSIS_DMA_Config(DMA_Stream_TypeDef* dma_stream, uint32_t* srcAdrr, uint32_t* dstAdrr, uint16_t dataSize){
-	dma_stream->CR &= ~DMA_SxCR_EN; //Stream enable
+	//dma_stream->CR &= ~DMA_SxCR_EN; //Stream enable
 	
 	dma_stream->PAR = (uint32_t) srcAdrr;
 
