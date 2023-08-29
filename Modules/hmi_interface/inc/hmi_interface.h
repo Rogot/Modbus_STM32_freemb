@@ -6,15 +6,13 @@
 #include "step_engine.h"
 #include <string.h>
 #include "dac_cmsis.h"
-
+#include "config_DWIN.h"
 
 #define MAX_PRGRMS_NUM								10
 #define BASE_PROGRAM_ADDRESS					0x0800C000
 #define STEPS_NUM 										3
 
 #define MAX_VEL_PROG									500000
-
-#define PEREPH_ENABLE									( 1 )
 
 #define STAGE_NUM											( 3 )
 

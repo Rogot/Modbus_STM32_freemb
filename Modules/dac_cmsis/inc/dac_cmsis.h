@@ -3,8 +3,7 @@
 
 #include <stm32f405xx.h>
 #include "stm32f4xx_hal.h"
-
-#define DAC_ENABLE							( 1 )
+#include "config_DWIN.h"
 
 typedef struct DAC_CMSIS {
 	TIM_TypeDef* tim;

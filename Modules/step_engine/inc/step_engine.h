@@ -6,10 +6,9 @@
 #include <stdio.h>
 #include "math.h"
 #include "mbport.h"
+#include "config_DWIN.h"
 
 /* DEFINE BEGIN */
-#define STEP_ENGINE_ENABLE		 			( 1 )
-#define STEP_ENGINE_TEST_ENABLE		  ( 0 )
 
 #define BASE_FREQ 									1e+5
 #define ACCEL_TIME_SEC 							1.0

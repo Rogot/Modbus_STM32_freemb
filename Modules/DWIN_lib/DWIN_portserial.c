@@ -79,7 +79,16 @@ static void UARTRxISR( void )
 #if DWIN_SERIAL_PORT_ENABLE
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
-
+	if (huart == DWIN_uart) {
+		eDWINEventType xEvent;
+		xDWINPortEventGet(&xEvent);
+		
+		if (xEvent == DWIN_EV_EXECUTE) {
+			xDWINPortEventPost(DWIN_EV_FRAME_SENT);
+		}
+		
+		DWIN_uart->Instance->SR &= ~USART_SR_RXNE;
+	}
 }
 /* --------------------------------------------------------------------------*/
 
@@ -108,6 +117,8 @@ void DMA2_Stream2_IRQHandler(void)
 		xDWINPortEventPost(DWIN_EV_FRAME_RECEIVED);
 	} else if (xEvent == DWIN_EV_FRAME_RECEIVED) {
 		xDWINPortEventPost(DWIN_EV_DATA_RECEIVED);
+	} else if (xEvent == DWIN_EV_DATA_RECEIVED) {
+		xDWINPortEventPost(DWIN_EV_EXECUTE);
 	}
 	
 	if (DMA2->LISR & DMA_LISR_TCIF2){

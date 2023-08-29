@@ -59,6 +59,7 @@ TIM_HandleTypeDef htim10;
 DMA_HandleTypeDef hdma_tim3_ch4_up;
 
 UART_HandleTypeDef huart1;
+DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
 extern t_control ctrl;
@@ -169,7 +170,7 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+	
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -242,6 +243,7 @@ int main(void)
 	#if DWIN_SERIAL_PORT_ENABLE
 	DWIN_PORT_SetDMAModule(DMA2_Stream2);
 	DWIN_PORT_SetUartModule(&huart1);
+	//CMSIS_DMA_Init(DMA2_Stream7);
 	CMSIS_DMA_Init(DMA2_Stream2);
 	//CMSIS_DMA_Config(DMA2_Stream2, &(USART1->DR), (uint32_t*)ucDWINBuf, 3);
 	
@@ -653,11 +655,15 @@ static void MX_DMA_Init(void)
 
   /* DMA controller clock enable */
   __HAL_RCC_DMA1_CLK_ENABLE();
+  __HAL_RCC_DMA2_CLK_ENABLE();
 
   /* DMA interrupt init */
   /* DMA1_Stream2_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
+  /* DMA2_Stream7_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream7_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream7_IRQn);
 
 }
 

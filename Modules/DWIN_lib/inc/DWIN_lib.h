@@ -3,10 +3,12 @@
 
 #include "hmi_interface.h"
 #include "dma_cmsis.h"
+#include "DWIN_port.h"
+#include "config_DWIN.h"
 
 /* ----------------------- Defines ------------------------------------------*/
-#define DWIN_SERIAL_PORT_ENABLE			( 1 )
 #define DWIN_HMI_PACKET_DATA_SIZE		 248
+#define DWIN_ADDR_START_DATA					4
 #define DWIN_CRC_ENABLE							( 0 )
 
 #define DWIN_ADDRESS_BROADCAST    	( 0 )   /*! Modbus broadcast address. */
@@ -141,10 +143,6 @@ void eDWINClose( void );
 eDWINErrorCode eDWINReceive( UCHAR * pucRcvAddress, UCHAR ** pucFrame, USHORT * pusLength, eDWINEventType * evType );
 												 
 eDWINErrorCode eDWINSend( UCHAR slaveAddress, const UCHAR * pucFrame, USHORT usLength );
-																				 
-BOOL xDWINReceiveFSM( void );
-																				 
-BOOL xDWINTransmitFSM( void );
 																														 
 eDWINErrorCode eDWINEnable( void );
 																				 
@@ -167,6 +165,9 @@ BOOL xDWINPortEventPost( eDWINEventType eEvent );
 
 BOOL xDWINPortEventGet(eDWINEventType* eEvent);
 
+/* ----------------------- Handle functions -----------------------------*/
+void eDWINFuncReadRegister(UCHAR * pucFrame, USHORT * usLen);
 
+void eDWINFuncWriteRegister(UCHAR * pucFrame, USHORT * usLen);
 
 #endif	//DWIN_LIB_H
