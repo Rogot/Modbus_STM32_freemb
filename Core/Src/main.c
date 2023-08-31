@@ -248,7 +248,7 @@ int main(void)
 	//CMSIS_DMA_Config(DMA2_Stream2, &(USART1->DR), (uint32_t*)ucDWINBuf, 3);
 	
 	eDWINErrorCode eStatus;
-	eDWINInit(0x01, 0, 115200, DWIN_PAR_NONE); 
+	eDWINInit(0xA5, 0, 115200, DWIN_PAR_NONE); 
 	eStatus = eDWINEnable();
 	if (eStatus != DWIN_ENOERR)
 	{

@@ -8,7 +8,7 @@
 
 /* ----------------------- Defines ------------------------------------------*/
 #define DWIN_HMI_PACKET_DATA_SIZE		 248
-#define DWIN_ADDR_START_DATA					4
+#define DWIN_ADDR_START_DATA					3
 #define DWIN_CRC_ENABLE							( 0 )
 
 #define DWIN_ADDRESS_BROADCAST    	( 0 )   /*! Modbus broadcast address. */
@@ -166,8 +166,8 @@ BOOL xDWINPortEventPost( eDWINEventType eEvent );
 BOOL xDWINPortEventGet(eDWINEventType* eEvent);
 
 /* ----------------------- Handle functions -----------------------------*/
-void eDWINFuncReadRegister(UCHAR * pucFrame, USHORT * usLen);
+void eDWINFuncReadRegister(UCHAR * pucFrame, UCHAR * registers, USHORT * usLen);
 
-void eDWINFuncWriteRegister(UCHAR * pucFrame, USHORT * usLen);
+void eDWINFuncWriteRegister(UCHAR * pucFrame, UCHAR * registers, USHORT * usLen);
 
 #endif	//DWIN_LIB_H
