@@ -21,13 +21,18 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "hmi_interface.h"
+
+#if MODBUS_ENABLE
 #include "mb.h"
 #include "mbport.h"
 #include "mt_port.h"
-#include "hmi_interface.h"
+#endif
 
+#if DWIN_SERIAL_PORT_ENABLE
 #include "DWIN_lib.h"
 #include "DWIN_port.h"
+#endif
 
 
 /* USER CODE END Includes */
@@ -74,13 +79,17 @@ extern t_modbus_him_pack txData;
 
 extern uint16_t rx_data[256];
 extern uint8_t rx_data_indx;
-#endif
 
 static USHORT usRegHoldingStart = REG_HOLDING_START;
 static int usRegHoldingBuf[REG_HOLDING_NREGS] = { 0x0 };
 	
 static USHORT usRegInputStart = REG_INPUT_START;
 static USHORT usRegInputBuf[REG_INPUT_NREGS] = { 0x0 };
+#endif
+
+#if DWIN_SERIAL_PORT_ENABLE
+extern volatile USHORT  ucRegistersBuf[DWIN_SER_PDU_SIZE_MAX];
+#endif 
 
 extern volatile UCHAR  ucDWINBuf[DWIN_SER_PDU_SIZE_MAX];
 extern uint16_t in_count;
@@ -179,10 +188,12 @@ int main(void)
   MX_TIM3_Init();
   MX_USART1_UART_Init();
   MX_TIM2_Init();
-  MX_ADC1_Init();
-  MX_TIM1_Init();
+	MX_TIM1_Init();
   MX_TIM10_Init();
   /* USER CODE BEGIN 2 */
+	#if HAL_ADC_MODULE_ENABLED
+  MX_ADC1_Init();
+  #endif
 	#if MODBUS_ENABLE
 	
 	MT_PORT_SetTimerModule(&htim10);
@@ -209,6 +220,7 @@ int main(void)
 	
 	usRegHoldingBuf[STAGE_1_POS] = 3600;
 	usRegHoldingBuf[STAGE_1_VEL] = 360;
+	//eMBEventType    eEvent;
 	#endif
 	init_HMI(&ctrl);
 	
@@ -227,7 +239,6 @@ int main(void)
 	
 	init_step_engine(&step_engine);
 	#endif
-	eMBEventType    eEvent;
 	uint8_t count = 0;
 	
 	#if DAC_ENABLE
@@ -277,12 +288,16 @@ int main(void)
 			#endif		
 		
 			#if DAC_ENABLE
-			dac.dac_type->DHR12R1 = a;
-			a++;
+			//dac.dac_type->DHR12R1 = a;
+			//a++;
 			#endif
 		
 			#if MODBUS_ENABLE
 			eHMIPoll(&ctrl, usRegHoldingBuf);
+			#endif
+		
+			#if DWIN_SERIAL_PORT_ENABLE
+			//eHMIPoll(&ctrl, ucRegistersBuf);
 			#endif
 		#endif
 		
@@ -731,7 +746,7 @@ static void MX_GPIO_Init(void)
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
 	if (hadc->Instance == ADC1) {
-		value = HAL_ADC_GetValue(&hadc1);
+		value = HAL_ADC_GetValue(hadc);
 		dac.dac_type->DHR12R1 = value;
 	}
 }
@@ -740,7 +755,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
 	is_start_pos = 0x01;
 }
-
+#if MODBUS_ENABLE
 eMBErrorCode eMBRegInputCB(UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNRegs)
 {
   eMBErrorCode eStatus = MB_ENOERR;
@@ -818,7 +833,7 @@ eMBErrorCode eMBRegDiscreteCB(UCHAR * pucRegBuffer, USHORT usAddress, USHORT usN
   return MB_ENOREG;
 }
 /*----------------------------------------------------------------------------*/
-
+#endif
 /* USER CODE END 4 */
 
 /**

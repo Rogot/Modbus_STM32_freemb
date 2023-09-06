@@ -5,7 +5,7 @@ t_step_engine step_engine;
 
 uint8_t start=0;
 
-eMBEventType    eEvent;
+
 extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim3;
 extern DMA_HandleTypeDef hdma_tim1_ch4_trig_com;
@@ -127,10 +127,6 @@ void move_step_engine(t_step_engine* step_eng, int16_t pos, float vel) {
 		 //(*step_eng).speedupCNT = (uint32_t)((*step_eng).cur_accel_size / 2) + 1;
 		 //(*step_eng).slowdownCNT = (*step_eng).cur_accel_size  - (*step_eng).speedupCNT;
 	 }
-	 
-	 //while (eEvent != EV_FRAME_SENT) {
-			//xMBPortEventGet(&eEvent);
-	 //}
 	 
 	 if ((*step_eng).speedupCNT == 0x0) {
 			TIM3->ARR = 1 / (*step_eng).vel;

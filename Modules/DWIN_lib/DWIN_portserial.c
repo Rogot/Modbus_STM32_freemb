@@ -105,9 +105,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 
 		}
 }
-#endif
+
 /* --------------------------------------------------------------------------*/
-//extern eDWINEventType xEvent;
 void DMA2_Stream2_IRQHandler(void)
 {
 	eDWINEventType xEvent;
@@ -116,9 +115,9 @@ void DMA2_Stream2_IRQHandler(void)
 	if (xEvent == DWIN_EV_READY) {
 		xDWINPortEventPost(DWIN_EV_FRAME_RECEIVED);
 	} else if (xEvent == DWIN_EV_FRAME_RECEIVED) {
-		xDWINPortEventPost(DWIN_EV_DATA_RECEIVED);
-	} else if (xEvent == DWIN_EV_DATA_RECEIVED) {
 		xDWINPortEventPost(DWIN_EV_EXECUTE);
+	//} else if (xEvent == DWIN_EV_DATA_RECEIVED) {
+	//	xDWINPortEventPost(DWIN_EV_EXECUTE);
 	}
 	
 	if (DMA2->LISR & DMA_LISR_TCIF2){
@@ -126,3 +125,5 @@ void DMA2_Stream2_IRQHandler(void)
 		DMA2->LIFCR |= DMA_LIFCR_CHTIF2;
 	}
 }
+
+#endif

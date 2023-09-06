@@ -22,6 +22,8 @@ DMA_Stream_TypeDef* DWIN_dma;
 UART_HandleTypeDef* DWIN_uart;
 extern eDWINEventType xEvent;
 
+extern t_addr_conv PLC_addr[PLC_ADDR_MAX]; /* PLC address */
+
 static UCHAR    ucDWINAddress;
 static eDWINMode  eDWINCurrentMode;
 
@@ -45,6 +47,7 @@ static pvDWINFrameStart pvDWINFrameStartCur;
 static pvDWINFrameStop pvDWINFrameStopCur;
 static peDWINFrameReceive peDWINFrameReceiveCur;
 static pvDWINFrameClose pvDWINFrameCloseCur;
+
 
 /* Callback functions required by the porting layer. They are called when
  * an external event has happend which includes a timeout or the reception
@@ -98,8 +101,8 @@ eDWINReceive( UCHAR * pucRcvAddress, UCHAR ** pucFrame,
 	 eDWINEventType eDWEvent;
 															
 															
-	 ENTER_CRITICAL_SECTION(  );
-	 assert( usDWRcvBufferPos < DWIN_SER_PDU_SIZE_MAX );
+	 //ENTER_CRITICAL_SECTION(  );
+	 //assert( usDWRcvBufferPos < DWIN_SER_PDU_SIZE_MAX );
 	
 	 #if DWIN_CRC_ENABLE	
 	 /* Length and CRC check */
@@ -121,47 +124,36 @@ eDWINReceive( UCHAR * pucRcvAddress, UCHAR ** pucFrame,
 				//CMSIS_DMA_Config(DWIN_dma, &(USART1->DR), (uint32_t*)ucDWINBuf, 3);
 			}
 			break;
-		 case DWIN_EV_DATA_RECEIVED:
-				CMSIS_DMA_Config(DWIN_dma, &(DWIN_uart->Instance->DR),
-												(uint32_t*)ucDWINBuf, 3);
-				(void) DWIN_uart->Instance->DR;
-				//DWIN_uart->Instance->CR1 |= USART_CR1_RXNEIE;
-				//xDWINPortEventPost(DWIN_EV_READY);
-			 break;
 	 }
 	
 	 #if DWIN_CRC_ENABLE	
 	 }
 	 #endif
 	 
-	 EXIT_CRITICAL_SECTION( );
+	 //EXIT_CRITICAL_SECTION( );
 	 return eStatus;
 }
 eDWINErrorCode eDWINSend( UCHAR slaveAddress, const UCHAR * pucFrame, USHORT usLength ) {
 		eDWINErrorCode		eStatus = DWIN_ENOERR;
 		USHORT						usCRC16;
 	
-		ENTER_CRITICAL_SECTION();
+		//ENTER_CRITICAL_SECTION();
 	
 		/* First byte before the Modbus-PDU is the slave address. */
-		//pucDWSndBufferCur = ( UCHAR * ) pucFrame - 1;
-		//usDWSndBufferCount = 1;
-			
-		ucDWINBuf[0] = 0x01;
-		ucDWINBuf[1] = 0x02;
-		ucDWINBuf[2] = 0x03;
 		/* Now copy the Modbus-PDU into the Modbus-Serial-Line-PDU. */
-		CMSIS_DMA_Config(DMA2_Stream7, (uint32_t*)ucDWINBuf, &(DWIN_uart->Instance->DR), 3);
+		HAL_UART_Transmit_DMA(DWIN_uart, (uint8_t *)ucDWINBuf, usLength);
+		//CMSIS_DMA_Config(DWIN_uart, (uint32_t*)ucDWINBuf, &(DWIN_uart->Instance->DR), usLength);
 		
+		//EXIT_CRITICAL_SECTION();
 }
 	
 void eDWINStart( void ) {
-	ENTER_CRITICAL_SECTION(  );
+	//ENTER_CRITICAL_SECTION(  );
 	
 	eDWRcvState = DWIN_STATE_RX_INIT;
 	vDWINPortSerialEnable( TRUE, FALSE );
 	
-	EXIT_CRITICAL_SECTION(  );
+	//EXIT_CRITICAL_SECTION(  );
 }	
 
 void eDWINStop( void ) {
@@ -189,7 +181,7 @@ eDWINErrorCode eDWINEnable( void ) {
 void eDWINDisable( void ) {}
 void eDWINSetSlaveID( void ) {}
 	
-void eDWINFuncReadRegister(UCHAR * pucFrame, UCHAR * registers, USHORT * usLen) {
+void eDWINFuncReadRegister(UCHAR * pucFrame, USHORT * registers, USHORT * usLen) {
 		USHORT          	usRegAddress;
     USHORT          	usRegCount;
     UCHAR          		*pucFrameCur;
@@ -199,7 +191,10 @@ void eDWINFuncReadRegister(UCHAR * pucFrame, UCHAR * registers, USHORT * usLen) 
 	
 	  eDWINException    eStatus = DWIN_EX_NONE;
     eDWINErrorCode    eRegStatus;
-		
+			
+		registers[4] = 0x5555;
+		registers[6] = 0x3333;
+	
 		while (ucLength < *usLen) {
 			/* read register number */
 			usRegAddress = ( USHORT )( pucFrame[DWIN_ADDR_START_DATA + ucLength++] << 8 );
@@ -211,14 +206,14 @@ void eDWINFuncReadRegister(UCHAR * pucFrame, UCHAR * registers, USHORT * usLen) 
 			
 			/* write register value to RX_TX_BUFFER */
 			for (uint8_t i = 0; i < dataCNT; i++) {
-				pucFrame[DWIN_ADDR_START_DATA + ucLength++] = ( UCHAR ) registers[usRegAddress] >> 8;
-				pucFrame[DWIN_ADDR_START_DATA + ucLength++] = ( UCHAR ) registers[usRegAddress] & 0xFF;
+				pucFrame[DWIN_ADDR_START_DATA + ucLength++] = ( USHORT ) registers[usRegAddress] >> 8;
+				pucFrame[DWIN_ADDR_START_DATA + ucLength++] = ( USHORT ) registers[usRegAddress] & 0xFF;
 			}
 		}
 		*usLen = ucLength + DWIN_ADDR_START_DATA;
 }
 
-void eDWINFuncWriteRegister(UCHAR * pucFrame, UCHAR * registers, USHORT * usLen) {
+void eDWINFuncWriteRegister(UCHAR * pucFrame, USHORT * registers, USHORT * usLen) {
 		USHORT          	usRegAddress;
     USHORT          	usRegCount;
     UCHAR          		*pucFrameCur;
@@ -233,12 +228,22 @@ void eDWINFuncWriteRegister(UCHAR * pucFrame, UCHAR * registers, USHORT * usLen)
 			usRegAddress = ( USHORT )( pucFrame[DWIN_ADDR_START_DATA + ucLength++] << 8 );
 			usRegAddress |= ( USHORT )( pucFrame[DWIN_ADDR_START_DATA + ucLength++] );
 			
+			/* convect HMI address to PLC address */
+			usRegAddress = conv_addr(PLC_addr, usRegAddress);
+			
+			ucLength++;
+			
 			/* write register value to RX_TX_BUFFER */
 			registers[usRegAddress] = ( USHORT ) pucFrame[DWIN_ADDR_START_DATA + ucLength++] << 8;
 			registers[usRegAddress] |= ( USHORT ) pucFrame[DWIN_ADDR_START_DATA + ucLength++];
 		}
 		//ucLength += DWIN_ADDR_START_DATA;
-		*usLen = ucLength + DWIN_ADDR_START_DATA;
+		//*usLen = ucLength + DWIN_ADDR_START_DATA;
+		*usLen = 3;
+		uint8_t i = 2;
+		pucFrame[DWIN_ADDR_START_DATA + i++] = 0x82;
+		pucFrame[DWIN_ADDR_START_DATA + i++] = 0x4F;
+		pucFrame[DWIN_ADDR_START_DATA + i] = 0x4B;
 }
 
 eDWINErrorCode eDWINPoll( void ) {
@@ -281,10 +286,10 @@ eDWINErrorCode eDWINPoll( void ) {
           }
 					break;
 				
-				case DWIN_EV_DATA_RECEIVED:
-					eStatus = peDWINFrameReceiveCur( &ucRcvAddress, &ucDWINFrame, &usLength, &eEvent);
-					xDWINPortEventPost(DWIN_EV_EXECUTE);
-					break;
+				//case DWIN_EV_DATA_RECEIVED:
+				//	eStatus = peDWINFrameReceiveCur( &ucRcvAddress, &ucDWINFrame, &usLength, &eEvent);
+				//	xDWINPortEventPost(DWIN_EV_EXECUTE);
+				//	break;
 				
 				case DWIN_EV_EXECUTE:
 					//CMSIS_DMA_Config(DMA2_Stream7, (uint32_t*)ucDWINBuf, &(DWIN_uart->Instance->DR), 5);
@@ -292,29 +297,31 @@ eDWINErrorCode eDWINPoll( void ) {
 					ucFunctionCode = ucDWINBuf[DWIN_CMD_POS];
 					eException = DWIN_EX_ILLEGAL_FUNCTION;
 				
-					if (ucFunctionCode == FUNC_CODE_READ) {
-						eDWINFuncReadRegister((UCHAR *)ucDWINBuf, (UCHAR *)ucRegistersBuf, &usLength);
-					} 
-					else if (ucFunctionCode == FUNC_CODE_WRITE) {
-						eDWINFuncWriteRegister((UCHAR *)ucDWINBuf, (UCHAR *)ucRegistersBuf, &usLength);
-					}
+					//if (ucFunctionCode == FUNC_CODE_READ) {
+					//	eDWINFuncReadRegister((UCHAR *)ucDWINBuf, ucRegistersBuf, &usLength);
+					//} 
+					//else if (ucFunctionCode == FUNC_CODE_WRITE) {
+						eDWINFuncWriteRegister((UCHAR *)ucDWINBuf, ucRegistersBuf, &usLength);
+					//}
 					/* If the request was not sent to the broadcast address we
            * return a reply. */
 					if ( ucDWINAddress != DWIN_ADDRESS_BROADCAST ) 
 					{
 						if ( eException != DWIN_EX_NONE ) 
 						{
-							HAL_UART_Transmit_DMA(DWIN_uart, (uint8_t *)ucDWINBuf, usLength);
+							eStatus = peDWINFrameSendCur ( ucDWINAddress, (UCHAR *)ucDWINBuf, usLength );
+							//HAL_UART_Transmit_DMA(DWIN_uart, (UCHAR *)ucDWINBuf, usLength);
 						}
 					}
-					//eStatus = peDWINFrameSendCur ( ucDWINAddress, ucDWINFrame_test, usLength );
-					//eStatus = peDWINFrameSendCur ( ucDWINAddress, ucDWINFrame, usLength );
 					#endif
 					//( void )xDWINPortEventPost( DWIN_EV_FRAME_SENT );
 					break;
 				
 				case DWIN_EV_FRAME_SENT:
 					( void )xDWINPortEventPost( DWIN_EV_READY );
+					CMSIS_DMA_Config(DWIN_dma, &(DWIN_uart->Instance->DR),
+													(uint32_t*)ucDWINBuf, 3);
+					(void) DWIN_uart->Instance->DR;
 					break;
 			}
 	}

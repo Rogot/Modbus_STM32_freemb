@@ -305,3 +305,27 @@ eMBFuncReadWriteMultipleHoldingRegister( UCHAR * pucFrame, USHORT * usLen )
 }
 
 #endif
+
+__weak eMBErrorCode eMBRegInputCB(UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNRegs)
+{
+  return MB_ENOREG;
+}
+
+/*----------------------------------------------------------------------------*/
+__weak eMBErrorCode eMBRegHoldingCB(UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNRegs,
+                             eMBRegisterMode eMode)
+{
+    return MB_ENOREG;
+}
+/*----------------------------------------------------------------------------*/
+__weak eMBErrorCode eMBRegCoilsCB(UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNCoils,
+                           eMBRegisterMode eMode)
+{
+  return MB_ENOREG;
+}
+/*----------------------------------------------------------------------------*/
+__weak eMBErrorCode eMBRegDiscreteCB(UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete)
+{
+  return MB_ENOREG;
+}
+/*----------------------------------------------------------------------------*/

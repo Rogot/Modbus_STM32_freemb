@@ -1,8 +1,7 @@
 #ifndef CONFIG_DWIN_H
 #define CONFIG_DWIN_H
-//#include "config_DWIN.h"
-//#include <stm32f405xx.h>
-//#include "stm32f4xx_hal.h"
+
+#include <stm32f405xx.h>
 
 #define DWIN_SERIAL_PORT_ENABLE			( 1 )
 
@@ -21,5 +20,18 @@
 #define STEP_ENGINE_TEST_ENABLE			( 0 )
 
 #define PEREPH_ENABLE								( 1 )
+
+#define HAL_ADC_MODULE_ENABLED			( 1 )
+
+typedef uint8_t BOOL;
+
+typedef unsigned char UCHAR;
+typedef char CHAR;
+
+typedef uint16_t USHORT;
+typedef int16_t SHORT;
+
+typedef uint32_t ULONG;
+typedef int32_t LONG;
 
 #endif //!CONFIG_DWIN_H

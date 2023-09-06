@@ -1,10 +1,13 @@
 #ifndef DWIN_LIB_H
 #define DWIN_LIB_H
 
+/* ----------------------- Includes -----------------------------------------*/
+
 #include "hmi_interface.h"
 #include "dma_cmsis.h"
 #include "DWIN_port.h"
 #include "config_DWIN.h"
+#include "DWIN_addr_conv.h"
 
 /* ----------------------- Defines ------------------------------------------*/
 #define DWIN_HMI_PACKET_DATA_SIZE		 248
@@ -71,7 +74,6 @@ typedef enum
 {
     DWIN_EV_READY,                   /*!< Startup finished. */
     DWIN_EV_FRAME_RECEIVED,          /*!< Start frame received. */
-		DWIN_EV_DATA_RECEIVED,					 /*!< Data frame received. */
     DWIN_EV_EXECUTE,                 /*!< Execute function. */
     DWIN_EV_FRAME_SENT               /*!< Frame sent. */
 } eDWINEventType;
@@ -143,7 +145,9 @@ void eDWINClose( void );
 eDWINErrorCode eDWINReceive( UCHAR * pucRcvAddress, UCHAR ** pucFrame, USHORT * pusLength, eDWINEventType * evType );
 												 
 eDWINErrorCode eDWINSend( UCHAR slaveAddress, const UCHAR * pucFrame, USHORT usLength );
-																														 
+
+eDWINErrorCode eDWINRequestSend( UCHAR slaveAddress, const UCHAR * pucFrame, USHORT usLength );
+																				 
 eDWINErrorCode eDWINEnable( void );
 																				 
 void eDWINDisable( void );
@@ -166,8 +170,8 @@ BOOL xDWINPortEventPost( eDWINEventType eEvent );
 BOOL xDWINPortEventGet(eDWINEventType* eEvent);
 
 /* ----------------------- Handle functions -----------------------------*/
-void eDWINFuncReadRegister(UCHAR * pucFrame, UCHAR * registers, USHORT * usLen);
+void eDWINFuncReadRegister(UCHAR * pucFrame, USHORT * registers, USHORT * usLen);
 
-void eDWINFuncWriteRegister(UCHAR * pucFrame, UCHAR * registers, USHORT * usLen);
+void eDWINFuncWriteRegister(UCHAR * pucFrame, USHORT * registers, USHORT * usLen);
 
 #endif	//DWIN_LIB_H
