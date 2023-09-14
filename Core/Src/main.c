@@ -47,6 +47,11 @@
 #define DWIN_USART_ENABLE			( 1 )
 #define DATA_USART2_TX				( 0 )
 	
+	/*DELETE*/
+	//extern eDWINEventType eQueuedEvent;
+	/*DELETE*/
+	
+	
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -154,6 +159,18 @@ void DataWrite(uint16_t data) {
 /* USER CODE BEGIN 0 */
 //eDWINEventType xEvent;
 uint16_t tepm[20];
+
+void Usart_init() {
+	USART1->BRR = (uint32_t) 0x00000271;
+	USART1->CR1 |= USART_CR1_UE; /* enable USART */
+	USART1->CR1 |= USART_CR1_RXNEIE; /* interrupt after complete recieve */
+	USART1->CR1 |= USART_CR1_TE;
+	USART1->CR1 |= USART_CR1_RE; /* RX and TX enable */
+	USART1->CR3 |= USART_CR3_DMAT;
+	USART1->CR3 |= USART_CR3_DMAR;
+	USART1->CR3 |= USART_CR3_EIE;
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -188,7 +205,8 @@ int main(void)
   MX_TIM3_Init();
   MX_USART1_UART_Init();
   MX_TIM2_Init();
-	MX_TIM1_Init();
+  MX_ADC1_Init();
+  MX_TIM1_Init();
   MX_TIM10_Init();
   /* USER CODE BEGIN 2 */
 	#if HAL_ADC_MODULE_ENABLED
@@ -272,6 +290,7 @@ int main(void)
 
 	HAL_ADC_Start_IT(&hadc1);
 	HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_1);
+	huart1.Instance->CR3 |= USART_CR3_DMAT | USART_CR3_DMAR;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -297,7 +316,7 @@ int main(void)
 			#endif
 		
 			#if DWIN_SERIAL_PORT_ENABLE
-			//eHMIPoll(&ctrl, ucRegistersBuf);
+			eHMIPoll(&ctrl, ucRegistersBuf);
 			#endif
 		#endif
 		

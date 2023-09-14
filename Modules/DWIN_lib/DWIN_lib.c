@@ -20,7 +20,8 @@ typedef enum
 //extern t_modbus_him_pack rxData;
 DMA_Stream_TypeDef* DWIN_dma;
 UART_HandleTypeDef* DWIN_uart;
-extern eDWINEventType xEvent;
+
+extern eDWINEventType eQueuedEvent;
 
 extern t_addr_conv PLC_addr[PLC_ADDR_MAX]; /* PLC address */
 
@@ -239,12 +240,13 @@ void eDWINFuncWriteRegister(UCHAR * pucFrame, USHORT * registers, USHORT * usLen
 		}
 		//ucLength += DWIN_ADDR_START_DATA;
 		//*usLen = ucLength + DWIN_ADDR_START_DATA;
-		*usLen = 3;
-		uint8_t i = 2;
-		pucFrame[DWIN_ADDR_START_DATA + i++] = 0x82;
-		pucFrame[DWIN_ADDR_START_DATA + i++] = 0x4F;
-		pucFrame[DWIN_ADDR_START_DATA + i] = 0x4B;
+		/**usLen = DWIN_ADDR_START_DATA;
+		pucFrame[(*usLen)++] = 0x83;
+		pucFrame[(*usLen)++] = 0x4F;
+		pucFrame[(*usLen)++] = 0x4B;*/
 }
+
+extern uint8_t print;
 
 eDWINErrorCode eDWINPoll( void ) {
 	static UCHAR*	 ucDWINFrame;
@@ -253,11 +255,12 @@ eDWINErrorCode eDWINPoll( void ) {
   static UCHAR    ucFunctionCode;
   static USHORT 	 usLength;
 	
+	static HAL_StatusTypeDef uStat;
 	static eDWINException eException;
   
 	int								i;
 	eDWINErrorCode    eStatus = DWIN_ENOERR;
-	eDWINEventType    eEvent;
+	eDWINEventType    eDWEvent;
 	
 	/* Check if the protocol stack is ready. */
 	if( eDWINState != DWIN_STATE_ENABLED )
@@ -267,15 +270,15 @@ eDWINErrorCode eDWINPoll( void ) {
 	
 	/* Check if there is a event available. If not return control to caller.
    * Otherwise we will handle the event. */
-  if( xDWINPortEventGet( &eEvent ) == TRUE )
+  if( xDWINPortEventGet( &eDWEvent ) == TRUE )
   {
-			switch (eEvent) {
+			switch (eDWEvent) {
 				case DWIN_EV_READY:
 
 					break;
 				
 				case DWIN_EV_FRAME_RECEIVED:
-					eStatus = peDWINFrameReceiveCur( &ucRcvAddress, &ucDWINFrame, &usLength, &eEvent);
+					eStatus = peDWINFrameReceiveCur( &ucRcvAddress, &ucDWINFrame, &usLength, &eDWEvent);
 					if( eStatus == DWIN_ENOERR )
           {
 						/* Check if the frame is for us. If not ignore the frame. */
@@ -296,12 +299,19 @@ eDWINErrorCode eDWINPoll( void ) {
 					#if 1
 					ucFunctionCode = ucDWINBuf[DWIN_CMD_POS];
 					eException = DWIN_EX_ILLEGAL_FUNCTION;
-				
 					//if (ucFunctionCode == FUNC_CODE_READ) {
 					//	eDWINFuncReadRegister((UCHAR *)ucDWINBuf, ucRegistersBuf, &usLength);
 					//} 
 					//else if (ucFunctionCode == FUNC_CODE_WRITE) {
-						eDWINFuncWriteRegister((UCHAR *)ucDWINBuf, ucRegistersBuf, &usLength);
+					eDWINFuncWriteRegister((UCHAR *)ucDWINBuf, ucRegistersBuf, &usLength);				
+					
+					usLength = 0;
+					ucDWINFrame_test[usLength++] = 0x5A;
+					ucDWINFrame_test[usLength++] = 0xA5;
+					ucDWINFrame_test[usLength++] = 0x03;
+					ucDWINFrame_test[usLength++] = 0x83;
+					ucDWINFrame_test[usLength++] = 0x4F;
+					ucDWINFrame_test[usLength++] = 0x4B;
 					//}
 					/* If the request was not sent to the broadcast address we
            * return a reply. */
@@ -309,19 +319,28 @@ eDWINErrorCode eDWINPoll( void ) {
 					{
 						if ( eException != DWIN_EX_NONE ) 
 						{
-							eStatus = peDWINFrameSendCur ( ucDWINAddress, (UCHAR *)ucDWINBuf, usLength );
-							//HAL_UART_Transmit_DMA(DWIN_uart, (UCHAR *)ucDWINBuf, usLength);
+							//eStatus = peDWINFrameSendCur ( ucDWINAddress, (UCHAR *)ucDWINBuf, usLength );
+							uStat = HAL_UART_Transmit_DMA(DWIN_uart, (UCHAR *)ucDWINFrame_test, usLength);
+							if (uStat == HAL_BUSY) {
+								xDWINPortEventPost(DWIN_EV_FRAME_SENT);
+							}
 						}
 					}
 					#endif
+					( void ) DWIN_uart->Instance->DR;
+					DWIN_uart->Instance->CR1 |= USART_CR1_RXNEIE;
 					//( void )xDWINPortEventPost( DWIN_EV_FRAME_SENT );
+
 					break;
 				
 				case DWIN_EV_FRAME_SENT:
-					( void )xDWINPortEventPost( DWIN_EV_READY );
+					ucDWINBuf[0] = 0x00;
+					ucDWINBuf[1] = 0x00;
+					ucDWINBuf[2] = 0x00;
 					CMSIS_DMA_Config(DWIN_dma, &(DWIN_uart->Instance->DR),
 													(uint32_t*)ucDWINBuf, 3);
 					(void) DWIN_uart->Instance->DR;
+					( void )xDWINPortEventPost( DWIN_EV_READY );
 					break;
 			}
 	}

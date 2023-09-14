@@ -169,6 +169,8 @@ BOOL xDWINPortEventPost( eDWINEventType eEvent );
 
 BOOL xDWINPortEventGet(eDWINEventType* eEvent);
 
+BOOL xDWINSetQueue( void );
+
 /* ----------------------- Handle functions -----------------------------*/
 void eDWINFuncReadRegister(UCHAR * pucFrame, USHORT * registers, USHORT * usLen);
 

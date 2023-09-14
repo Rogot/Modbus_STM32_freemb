@@ -156,6 +156,7 @@ void move_start_pos(t_control* comtrl) {
 *	@param (usRegBuf) - MODBUS array
 */
 void eHMIPoll(t_control* comtrl, int* usRegBuf) {
+	
 	refresh_reg(comtrl, usRegBuf);
 	
 	#if STEP_ENGINE_ENABLE

@@ -1,5 +1,5 @@
 #include "DWIN_lib.h"
-
+#include "stm32f4xx_hal.h"
 /* ----------------------- static functions ---------------------------------*/
 static void UARTTxReadyISR( void );
 static void UARTRxISR( void );
@@ -80,14 +80,14 @@ static void UARTRxISR( void )
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
 	if (huart == DWIN_uart) {
-		eDWINEventType xEvent;
+/*		eDWINEventType xEvent;
 		xDWINPortEventGet(&xEvent);
 		
 		if (xEvent == DWIN_EV_EXECUTE) {
 			xDWINPortEventPost(DWIN_EV_FRAME_SENT);
 		}
-		
-		DWIN_uart->Instance->SR &= ~USART_SR_RXNE;
+		*/
+		//DWIN_uart->Instance->SR &= ~USART_SR_RXNE;
 	}
 }
 /* --------------------------------------------------------------------------*/
@@ -110,20 +110,40 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 void DMA2_Stream2_IRQHandler(void)
 {
 	eDWINEventType xEvent;
+	xDWINSetQueue();
 	xDWINPortEventGet(&xEvent);
 	
 	if (xEvent == DWIN_EV_READY) {
 		xDWINPortEventPost(DWIN_EV_FRAME_RECEIVED);
 	} else if (xEvent == DWIN_EV_FRAME_RECEIVED) {
 		xDWINPortEventPost(DWIN_EV_EXECUTE);
-	//} else if (xEvent == DWIN_EV_DATA_RECEIVED) {
-	//	xDWINPortEventPost(DWIN_EV_EXECUTE);
 	}
 	
 	if (DMA2->LISR & DMA_LISR_TCIF2){
 		DMA2->LIFCR |= DMA_LIFCR_CTCIF2;
 		DMA2->LIFCR |= DMA_LIFCR_CHTIF2;
 	}
+}
+
+void DMA2_Stream7_IRQHandler(void)
+{
+	eDWINEventType xEvent;
+	//xDWINSetQueue();
+	//xDWINPortEventGet(&xEvent);
+	
+	ucDWINBuf[0] = 0x99;
+	
+	//if (xEvent == DWIN_EV_EXECUTE) {
+	xDWINPortEventPost(DWIN_EV_FRAME_SENT);
+	//}
+	
+	if (DMA2->HISR & DMA_HISR_TCIF7){
+		DMA2->HIFCR |= DMA_HIFCR_CTCIF7;
+		DMA2->HIFCR |= DMA_HIFCR_CHTIF7;
+	}
+	
+	//DMA2->HIFCR |= DMA_HIFCR_CFEIF7;
+	//DWIN_uart->Instance->SR &= ~USART_SR_TC;
 }
 
 #endif

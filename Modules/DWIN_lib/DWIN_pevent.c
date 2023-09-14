@@ -32,3 +32,7 @@ xDWINPortEventGet( eDWINEventType * eEvent )
     }
     return xEventHappened;
 }
+
+BOOL xDWINSetQueue( void ) {
+	xEventInQueue = TRUE;
+}
