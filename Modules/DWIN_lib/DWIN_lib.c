@@ -137,14 +137,17 @@ eDWINReceive( UCHAR * pucRcvAddress, UCHAR ** pucFrame,
 eDWINErrorCode eDWINSend( UCHAR slaveAddress, const UCHAR * pucFrame, USHORT usLength ) {
 		eDWINErrorCode		eStatus = DWIN_ENOERR;
 		USHORT						usCRC16;
+	  HAL_StatusTypeDef uStat;
 	
 		//ENTER_CRITICAL_SECTION();
 	
 		/* First byte before the Modbus-PDU is the slave address. */
 		/* Now copy the Modbus-PDU into the Modbus-Serial-Line-PDU. */
-		HAL_UART_Transmit_DMA(DWIN_uart, (uint8_t *)ucDWINBuf, usLength);
+		uStat = HAL_UART_Transmit_DMA(DWIN_uart, (uint8_t *)ucDWINBuf, usLength);
 		//CMSIS_DMA_Config(DWIN_uart, (uint32_t*)ucDWINBuf, &(DWIN_uart->Instance->DR), usLength);
-		
+		if (uStat == HAL_BUSY) {
+				return DWIN_TX_BUSY;
+		}
 		//EXIT_CRITICAL_SECTION();
 }
 	
@@ -192,9 +195,6 @@ void eDWINFuncReadRegister(UCHAR * pucFrame, USHORT * registers, USHORT * usLen)
 	
 	  eDWINException    eStatus = DWIN_EX_NONE;
     eDWINErrorCode    eRegStatus;
-			
-		registers[4] = 0x5555;
-		registers[6] = 0x3333;
 	
 		while (ucLength < *usLen) {
 			/* read register number */
@@ -255,7 +255,6 @@ eDWINErrorCode eDWINPoll( void ) {
   static UCHAR    ucFunctionCode;
   static USHORT 	 usLength;
 	
-	static HAL_StatusTypeDef uStat;
 	static eDWINException eException;
   
 	int								i;
@@ -319,9 +318,8 @@ eDWINErrorCode eDWINPoll( void ) {
 					{
 						if ( eException != DWIN_EX_NONE ) 
 						{
-							//eStatus = peDWINFrameSendCur ( ucDWINAddress, (UCHAR *)ucDWINBuf, usLength );
-							uStat = HAL_UART_Transmit_DMA(DWIN_uart, (UCHAR *)ucDWINFrame_test, usLength);
-							if (uStat == HAL_BUSY) {
+							eStatus = peDWINFrameSendCur( ucDWINAddress, (UCHAR *)ucDWINFrame_test, usLength );
+							if (eStatus == DWIN_TX_BUSY) {
 								xDWINPortEventPost(DWIN_EV_FRAME_SENT);
 							}
 						}

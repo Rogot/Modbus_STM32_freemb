@@ -274,7 +274,9 @@ int main(void)
 	DWIN_PORT_SetUartModule(&huart1);
 	//CMSIS_DMA_Init(DMA2_Stream7);
 	CMSIS_DMA_Init(DMA2_Stream2);
-	//CMSIS_DMA_Config(DMA2_Stream2, &(USART1->DR), (uint32_t*)ucDWINBuf, 3);
+	
+	HAL_NVIC_SetPriority(USART2_IRQn, 0, 0);                                        
+	HAL_NVIC_EnableIRQ(USART2_IRQn);
 	
 	eDWINErrorCode eStatus;
 	eDWINInit(0xA5, 0, 115200, DWIN_PAR_NONE); 

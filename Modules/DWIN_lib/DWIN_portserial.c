@@ -140,8 +140,22 @@ void DMA2_Stream7_IRQHandler(void)
 	if (DMA2->HISR & DMA_HISR_TCIF7){
 		DMA2->HIFCR |= DMA_HIFCR_CTCIF7;
 		DMA2->HIFCR |= DMA_HIFCR_CHTIF7;
+	
+		while (!(DWIN_uart->Instance->SR & USART_SR_TC));
 	}
 	
+	#if 0
+	if (((DWIN_uart->Instance->SR & USART_SR_TC) != RESET) 
+				&& ((DWIN_uart->Instance->CR1 & USART_CR1_TCIE) != RESET))
+  {
+		__HAL_UART_DISABLE_IT(DWIN_uart, UART_IT_TC);
+
+		/* Tx process is ended, restore huart->gState to Ready */
+		DWIN_uart->gState = HAL_UART_STATE_READY;
+		
+		HAL_UART_TxCpltCallback(DWIN_uart);
+  }
+	#endif
 	//DMA2->HIFCR |= DMA_HIFCR_CFEIF7;
 	//DWIN_uart->Instance->SR &= ~USART_SR_TC;
 }

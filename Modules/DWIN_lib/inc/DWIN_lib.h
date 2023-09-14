@@ -2,6 +2,7 @@
 #define DWIN_LIB_H
 
 /* ----------------------- Includes -----------------------------------------*/
+//#include "stm32f4xx_hal_uart.h"
 
 #include "hmi_interface.h"
 #include "dma_cmsis.h"
@@ -99,7 +100,8 @@ typedef enum
     DWIN_ENORES,                  /*!< insufficient resources. */
     DWIN_EIO,                     /*!< I/O error. */
     DWIN_EILLSTATE,               /*!< protocol stack in illegal state. */
-    DWIN_ETIMEDOUT                /*!< timeout error occurred. */
+    DWIN_ETIMEDOUT,               /*!< timeout error occurred. */
+	  DWIN_TX_BUSY,									/*!< Tx is busy */
 } eDWINErrorCode;
 
 
