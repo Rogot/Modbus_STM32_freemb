@@ -88,13 +88,15 @@ eDWINInit(UCHAR ucSlaveAddress, UCHAR ucPort, ULONG ulBaudRate, eDWINParity ePar
 	}
 	
 	eDWINState = DWIN_STATE_DISABLED;
-	xDWINPortEventPost(DWIN_EV_READY);
 	
+	HAL_UARTEx_ReceiveToIdle_IT(DWIN_uart, (uint8_t *)ucDWINBuf, DWIN_SER_PDU_SIZE_MAX);
+	
+	xDWINPortEventPost(DWIN_EV_READY);
 	return eStatus;
 }
 
 eDWINErrorCode
-eDWINReceive( UCHAR * pucRcvAddress, UCHAR ** pucFrame,
+eDWINReceive( UCHAR * pucRcvAddress, UCHAR * pucFrame,
 														USHORT * pusLength, eDWINEventType * evType) {
 	 BOOL            xFrameReceived = FALSE;
    eDWINErrorCode    eStatus = DWIN_ENOERR;
@@ -116,13 +118,19 @@ eDWINReceive( UCHAR * pucRcvAddress, UCHAR ** pucFrame,
 			if (ucDWINBuf[DWIN_START_POS] == DWIN_START_BIT) {
 				*pucRcvAddress = ucDWINBuf[DWIN_SLAVE_ID_POS];
 				*pusLength = ucDWINBuf[DWIN_WORD_LENGTH_POS];
-				CMSIS_DMA_Config(DWIN_dma, &(DWIN_uart->Instance->DR),
-												(uint32_t*)(ucDWINBuf + 3),
-												 ucDWINBuf[DWIN_WORD_LENGTH_POS]);
-				xFrameReceived = TRUE;
+				
+				/* copy data from RX array to storage array and start wait new */
+				#if 0
+				for (uint8_t i = 0; i < (*pusLength + DWIN_ADDR_START_DATA); i++) {
+					pucFrame[i] = ucDWINBuf[i];
+				}
+				#endif
+				xDWINPortEventPost(DWIN_EV_EXECUTE);
 			} else { 
 				//xDWINPortEventPost(DWIN_EV_READY);
-				//CMSIS_DMA_Config(DWIN_dma, &(USART1->DR), (uint32_t*)ucDWINBuf, 3);
+				HAL_UARTEx_ReceiveToIdle_IT(DWIN_uart,
+															(uint8_t *)ucDWINBuf,
+															DWIN_SER_PDU_SIZE_MAX);
 			}
 			break;
 	 }
@@ -143,6 +151,7 @@ eDWINErrorCode eDWINSend( UCHAR slaveAddress, const UCHAR * pucFrame, USHORT usL
 	
 		/* First byte before the Modbus-PDU is the slave address. */
 		/* Now copy the Modbus-PDU into the Modbus-Serial-Line-PDU. */
+		//__HAL_UART_ENABLE_IT(DWIN_uart, UART_IT_TC);
 		uStat = HAL_UART_Transmit_DMA(DWIN_uart, (uint8_t *)ucDWINBuf, usLength);
 		//CMSIS_DMA_Config(DWIN_uart, (uint32_t*)ucDWINBuf, &(DWIN_uart->Instance->DR), usLength);
 		if (uStat == HAL_BUSY) {
@@ -250,7 +259,7 @@ extern uint8_t print;
 
 eDWINErrorCode eDWINPoll( void ) {
 	static UCHAR*	 ucDWINFrame;
-	static UCHAR	 ucDWINFrame_test[20];
+	static UCHAR	 ucDWINFrame_TX[20];
 	static UCHAR    ucRcvAddress;
   static UCHAR    ucFunctionCode;
   static USHORT 	 usLength;
@@ -277,7 +286,7 @@ eDWINErrorCode eDWINPoll( void ) {
 					break;
 				
 				case DWIN_EV_FRAME_RECEIVED:
-					eStatus = peDWINFrameReceiveCur( &ucRcvAddress, &ucDWINFrame, &usLength, &eDWEvent);
+					eStatus = peDWINFrameReceiveCur( &ucRcvAddress, ucDWINFrame, &usLength, &eDWEvent);
 					if( eStatus == DWIN_ENOERR )
           {
 						/* Check if the frame is for us. If not ignore the frame. */
@@ -305,12 +314,12 @@ eDWINErrorCode eDWINPoll( void ) {
 					eDWINFuncWriteRegister((UCHAR *)ucDWINBuf, ucRegistersBuf, &usLength);				
 					
 					usLength = 0;
-					ucDWINFrame_test[usLength++] = 0x5A;
-					ucDWINFrame_test[usLength++] = 0xA5;
-					ucDWINFrame_test[usLength++] = 0x03;
-					ucDWINFrame_test[usLength++] = 0x83;
-					ucDWINFrame_test[usLength++] = 0x4F;
-					ucDWINFrame_test[usLength++] = 0x4B;
+					ucDWINFrame_TX[usLength++] = 0x5A;
+					ucDWINFrame_TX[usLength++] = 0xA5;
+					ucDWINFrame_TX[usLength++] = 0x03;
+					ucDWINFrame_TX[usLength++] = 0x83;
+					ucDWINFrame_TX[usLength++] = 0x4F;
+					ucDWINFrame_TX[usLength++] = 0x4B;
 					//}
 					/* If the request was not sent to the broadcast address we
            * return a reply. */
@@ -318,15 +327,15 @@ eDWINErrorCode eDWINPoll( void ) {
 					{
 						if ( eException != DWIN_EX_NONE ) 
 						{
-							eStatus = peDWINFrameSendCur( ucDWINAddress, (UCHAR *)ucDWINFrame_test, usLength );
+							eStatus = peDWINFrameSendCur( ucDWINAddress, (UCHAR *)ucDWINFrame_TX, usLength );
 							if (eStatus == DWIN_TX_BUSY) {
 								xDWINPortEventPost(DWIN_EV_FRAME_SENT);
 							}
 						}
 					}
 					#endif
-					( void ) DWIN_uart->Instance->DR;
-					DWIN_uart->Instance->CR1 |= USART_CR1_RXNEIE;
+					//( void ) DWIN_uart->Instance->DR;
+					//DWIN_uart->Instance->CR1 |= USART_CR1_RXNEIE;
 					//( void )xDWINPortEventPost( DWIN_EV_FRAME_SENT );
 
 					break;
@@ -335,9 +344,10 @@ eDWINErrorCode eDWINPoll( void ) {
 					ucDWINBuf[0] = 0x00;
 					ucDWINBuf[1] = 0x00;
 					ucDWINBuf[2] = 0x00;
-					CMSIS_DMA_Config(DWIN_dma, &(DWIN_uart->Instance->DR),
-													(uint32_t*)ucDWINBuf, 3);
-					(void) DWIN_uart->Instance->DR;
+					
+					HAL_UARTEx_ReceiveToIdle_IT(DWIN_uart,
+															(uint8_t *)ucDWINBuf,
+															DWIN_SER_PDU_SIZE_MAX);
 					( void )xDWINPortEventPost( DWIN_EV_READY );
 					break;
 			}

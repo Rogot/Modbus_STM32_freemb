@@ -34,7 +34,6 @@
 #include "DWIN_port.h"
 #endif
 
-
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -44,14 +43,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define DWIN_USART_ENABLE			( 1 )
-#define DATA_USART2_TX				( 0 )
-	
-	/*DELETE*/
-	//extern eDWINEventType eQueuedEvent;
-	/*DELETE*/
-	
-	
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -62,11 +54,9 @@
 /* Private variables ---------------------------------------------------------*/
 ADC_HandleTypeDef hadc1;
 
-TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim10;
-DMA_HandleTypeDef hdma_tim3_ch4_up;
 
 UART_HandleTypeDef huart1;
 DMA_HandleTypeDef hdma_usart1_tx;
@@ -94,82 +84,30 @@ static USHORT usRegInputBuf[REG_INPUT_NREGS] = { 0x0 };
 
 #if DWIN_SERIAL_PORT_ENABLE
 extern volatile USHORT  ucRegistersBuf[DWIN_SER_PDU_SIZE_MAX];
-#endif 
-
 extern volatile UCHAR  ucDWINBuf[DWIN_SER_PDU_SIZE_MAX];
+#endif 
 extern uint16_t in_count;
 t_dac dac;
 uint8_t is_start_pos = 0x0;
 
-/* TEST */
-extern int32_t step_count;
-extern float vel_val;
-extern size_t accel_size;
-int value = 0;
-/* TEST */
 t_devices dev;
-
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_DMA_Init(void);
-static void MX_TIM3_Init(void);
 static void MX_USART1_UART_Init(void);
-static void MX_TIM2_Init(void);
-static void MX_ADC1_Init(void);
-static void MX_TIM1_Init(void);
 static void MX_TIM10_Init(void);
+static void MX_ADC1_Init(void);
+static void MX_TIM2_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
-
-#if DATA_USART2_TX
-uint16_t cnt = 0;
-
-void DataWrite(uint16_t data) {
-		
-		uint8_t low_byte = data;
-		data = data >> 8;
-		uint8_t high_byte = data;
-		
-		uint8_t mdata[14] = { 0x00 };
-	
-	  mdata[0] = 0x5A;
-		mdata[1] = 0xA5;
-		mdata[2] = 0x0B;
-		mdata[3] = 0x82;
-		mdata[4] = 0x03;
-		mdata[5] = 0x10;
-		mdata[6] = 0x5A;
-		mdata[7] = 0xA5;
-		mdata[8] = 0x01;
-		mdata[9] = 0x00;
-		mdata[10] = 0x00;
-		mdata[11] = 0x01;
-		mdata[12] = high_byte;
-		mdata[13] = low_byte;
-	
-		HAL_UART_Transmit(&huart1, mdata, 14, 300);
-}
-#endif
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-//eDWINEventType xEvent;
-uint16_t tepm[20];
-
-void Usart_init() {
-	USART1->BRR = (uint32_t) 0x00000271;
-	USART1->CR1 |= USART_CR1_UE; /* enable USART */
-	USART1->CR1 |= USART_CR1_RXNEIE; /* interrupt after complete recieve */
-	USART1->CR1 |= USART_CR1_TE;
-	USART1->CR1 |= USART_CR1_RE; /* RX and TX enable */
-	USART1->CR3 |= USART_CR3_DMAT;
-	USART1->CR3 |= USART_CR3_DMAR;
-	USART1->CR3 |= USART_CR3_EIE;
-}
 
 /* USER CODE END 0 */
 
@@ -196,22 +134,21 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-	
+
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
-  MX_TIM3_Init();
   MX_USART1_UART_Init();
-  MX_TIM2_Init();
-  MX_ADC1_Init();
-  MX_TIM1_Init();
   MX_TIM10_Init();
+  MX_TIM2_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
 	#if HAL_ADC_MODULE_ENABLED
   MX_ADC1_Init();
   #endif
+	
 	#if MODBUS_ENABLE
 	
 	MT_PORT_SetTimerModule(&htim10);
@@ -225,22 +162,24 @@ int main(void)
 	{
 	// Error handling
 	}
-	#endif
 	
-	dev.step_engine = &step_engine;
-	
-	ctrl.dev = &dev;
-	ctrl.programms = programs;
-	#if MODBUS_ENABLE
 	usRegHoldingBuf[NUM_EXE_PROGRAM] = 0x01;
 	usRegHoldingBuf[STEP_ENGINE_VEL_MC] = 0x30;
 	usRegHoldingBuf[STEP_ENGINE_START_POS_MS] = 0x51;
 	
 	usRegHoldingBuf[STAGE_1_POS] = 3600;
 	usRegHoldingBuf[STAGE_1_VEL] = 360;
-	//eMBEventType    eEvent;
+	
 	#endif
+	
+	#if PEREPH_ENABLE
+	dev.step_engine = &step_engine;
+	
+	ctrl.dev = &dev;
+	ctrl.programms = programs;
+	
 	init_HMI(&ctrl);
+	#endif
 	
 	#if STEP_ENGINE_ENABLE
 	//HAL_DBGMCU_EnableDBGStandbyMode();
@@ -257,6 +196,7 @@ int main(void)
 	
 	init_step_engine(&step_engine);
 	#endif
+	
 	uint8_t count = 0;
 	
 	#if DAC_ENABLE
@@ -270,16 +210,17 @@ int main(void)
 	#endif
 	
 	#if DWIN_SERIAL_PORT_ENABLE
-	DWIN_PORT_SetDMAModule(DMA2_Stream2);
+	//DWIN_PORT_SetDMAModule(DMA2_Stream2);
 	DWIN_PORT_SetUartModule(&huart1);
 	//CMSIS_DMA_Init(DMA2_Stream7);
-	CMSIS_DMA_Init(DMA2_Stream2);
+	//CMSIS_DMA_Init(DMA2_Stream2);
 	
-	HAL_NVIC_SetPriority(USART2_IRQn, 0, 0);                                        
-	HAL_NVIC_EnableIRQ(USART2_IRQn);
+	//HAL_NVIC_SetPriority(USART1_IRQn, 0, 0);                                        
+	//HAL_NVIC_EnableIRQ(USART1_IRQn);
 	
 	eDWINErrorCode eStatus;
 	eDWINInit(0xA5, 0, 115200, DWIN_PAR_NONE); 
+	
 	eStatus = eDWINEnable();
 	if (eStatus != DWIN_ENOERR)
 	{
@@ -287,18 +228,13 @@ int main(void)
 	}
 	#endif
 	
-	//search_home(&ctrl);
-//	is_start_pos = 0x00;
-
-	HAL_ADC_Start_IT(&hadc1);
-	HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_1);
-	huart1.Instance->CR3 |= USART_CR3_DMAT | USART_CR3_DMAR;
+	//HAL_UARTEx_ReceiveToIdle_IT(&huart1, (uint8_t *)ucDWINBuf, DWIN_SER_PDU_SIZE_MAX);
+	
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-	
-	while (1)
+  while (1)
   {
 		#if PEREPH_ENABLE
 			#if DATA_USART2_TX
@@ -432,70 +368,6 @@ static void MX_ADC1_Init(void)
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
-
-}
-
-/**
-  * @brief TIM1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_TIM1_Init(void)
-{
-
-  /* USER CODE BEGIN TIM1_Init 0 */
-
-  /* USER CODE END TIM1_Init 0 */
-
-  TIM_MasterConfigTypeDef sMasterConfig = {0};
-  TIM_OC_InitTypeDef sConfigOC = {0};
-  TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
-
-  /* USER CODE BEGIN TIM1_Init 1 */
-
-  /* USER CODE END TIM1_Init 1 */
-  htim1.Instance = TIM1;
-  htim1.Init.Prescaler = 719;
-  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-  htim1.Init.Period = 10;
-  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-  htim1.Init.RepetitionCounter = 0;
-  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
-  if (HAL_TIM_OC_Init(&htim1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
-  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
-  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sConfigOC.OCMode = TIM_OCMODE_TOGGLE;
-  sConfigOC.Pulse = 0;
-  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
-  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
-  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
-  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
-  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
-  if (HAL_TIM_OC_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
-  sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
-  sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
-  sBreakDeadTimeConfig.DeadTime = 0;
-  sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
-  sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
-  sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
-  if (HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBreakDeadTimeConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN TIM1_Init 2 */
-
-  /* USER CODE END TIM1_Init 2 */
 
 }
 
@@ -676,9 +548,7 @@ static void MX_USART1_UART_Init(void)
     Error_Handler();
   }
   /* USER CODE BEGIN USART1_Init 2 */
-	#if DWIN_SERIAL_PORT_ENABLE
-	USART1->CR3 |= USART_CR3_DMAR; //USART DMA recieve enable
-  #endif
+
   /* USER CODE END USART1_Init 2 */
 
 }
@@ -690,13 +560,9 @@ static void MX_DMA_Init(void)
 {
 
   /* DMA controller clock enable */
-  __HAL_RCC_DMA1_CLK_ENABLE();
   __HAL_RCC_DMA2_CLK_ENABLE();
 
   /* DMA interrupt init */
-  /* DMA1_Stream2_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream2_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream2_IRQn);
   /* DMA2_Stream7_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream7_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream7_IRQn);
@@ -726,21 +592,15 @@ static void MX_GPIO_Init(void)
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : PA0 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  /*Configure GPIO pins : PA0 PA1 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PA1 */
-  GPIO_InitStruct.Pin = GPIO_PIN_1;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
   /*Configure GPIO pin : PB1 */
   GPIO_InitStruct.Pin = GPIO_PIN_1;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
@@ -752,109 +612,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI0_IRQn, 1, 0);
-  HAL_NVIC_EnableIRQ(EXTI0_IRQn);
-
-  HAL_NVIC_SetPriority(EXTI1_IRQn, 1, 0);
-  HAL_NVIC_EnableIRQ(EXTI1_IRQn);
-
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
 }
 
 /* USER CODE BEGIN 4 */
 
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
-	if (hadc->Instance == ADC1) {
-		value = HAL_ADC_GetValue(hadc);
-		dac.dac_type->DHR12R1 = value;
-	}
-}
-
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
-	is_start_pos = 0x01;
-}
-#if MODBUS_ENABLE
-eMBErrorCode eMBRegInputCB(UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNRegs)
-{
-  eMBErrorCode eStatus = MB_ENOERR;
-  int iRegIndex;
-  if ((usAddress >= REG_INPUT_START) &&
-      (usAddress + usNRegs <= REG_INPUT_START + REG_INPUT_NREGS))
-  {
-    iRegIndex = (int)(usAddress - usRegInputStart);
-    while(usNRegs > 0)
-    {
-        *pucRegBuffer++ = (unsigned char)(usRegInputBuf[iRegIndex] >> 8);
-        *pucRegBuffer++ = (unsigned char)(usRegInputBuf[iRegIndex] & 0xFF);
-        iRegIndex++;
-        usNRegs--;
-    }
-  }
-  else
-  {
-    eStatus = MB_ENOREG;
-  }
-  return eStatus;
-}
-
-/*----------------------------------------------------------------------------*/
-eMBErrorCode eMBRegHoldingCB(UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNRegs,
-                             eMBRegisterMode eMode)
-{
-	eMBErrorCode    eStatus = MB_ENOERR;
-    int             iRegIndex;
-
-    if( ( usAddress >= REG_HOLDING_START ) &&
-        ( usAddress + usNRegs <= REG_HOLDING_START + REG_HOLDING_NREGS ) )
-    {
-        iRegIndex = ( int )( usAddress - usRegHoldingStart );
-        switch ( eMode )
-        {
-            /* Pass current register values to the protocol stack. */
-        case MB_REG_READ:
-            while( usNRegs > 0 )
-            {
-                *pucRegBuffer++ = ( unsigned char )( usRegHoldingBuf[iRegIndex] >> 8 );
-                *pucRegBuffer++ = ( unsigned char )( usRegHoldingBuf[iRegIndex] & 0xFF );
-                iRegIndex++;
-                usNRegs--;
-            }
-            break;
-
-            /* Update current register values with new values from the
-             * protocol stack. */
-        case MB_REG_WRITE:
-            while( usNRegs > 0 )
-            {
-                usRegHoldingBuf[iRegIndex] = *pucRegBuffer++ << 8;
-                usRegHoldingBuf[iRegIndex] |= *pucRegBuffer++;
-                iRegIndex++;
-                usNRegs--;
-            }
-        }
-    }
-    else
-    {
-        eStatus = MB_ENOREG;
-    }
-    return eStatus;
-}
-/*----------------------------------------------------------------------------*/
-eMBErrorCode eMBRegCoilsCB(UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNCoils,
-                           eMBRegisterMode eMode)
-{
-  return MB_ENOREG;
-}
-/*----------------------------------------------------------------------------*/
-eMBErrorCode eMBRegDiscreteCB(UCHAR * pucRegBuffer, USHORT usAddress, USHORT usNDiscrete)
-{
-  return MB_ENOREG;
-}
-/*----------------------------------------------------------------------------*/
-#endif
 /* USER CODE END 4 */
 
 /**

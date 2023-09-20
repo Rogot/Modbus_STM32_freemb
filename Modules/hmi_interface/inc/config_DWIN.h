@@ -9,7 +9,7 @@
 
 #define DMA_ENABLE									( 1 )
 
-#define DWIN_USART_ENABLE						( 1 )
+#define DWIN_USART_ENABLE						( 0 )
 
 #define DATA_USART2_TX							( 0 )
 

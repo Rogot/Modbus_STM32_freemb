@@ -76,6 +76,7 @@ static void UARTRxISR( void )
 }
 
 /* --------------------------------------------------------------------------*/
+
 #if DWIN_SERIAL_PORT_ENABLE
 void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
@@ -95,12 +96,35 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 
 extern volatile UCHAR  ucDWINBuf[];
 
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size) {
+		if (huart->Instance == DWIN_uart->Instance)
+		{
+			eDWINEventType xEvent;
+			xDWINSetQueue();
+			xDWINPortEventGet(&xEvent);
+			
+			if (xEvent == DWIN_EV_READY) {
+				xDWINPortEventPost(DWIN_EV_FRAME_RECEIVED);
+			}
+			
+			//HAL_UART_Transmit_IT(DWIN_uart,(uint8_t *)ucDWINBuf, Size);
+			
+			/*HAL_UARTEx_ReceiveToIdle_IT(DWIN_uart,
+															(uint8_t *)ucDWINBuf,
+															DWIN_SER_PDU_SIZE_MAX);
+			*/
+			//CMSIS_DMA_Config(DWIN_dma, &(DWIN_uart->Instance->DR), (uint32_t*)ucDWINBuf, 3);
+			//DWIN_uart->Instance->SR &= ~USART_SR_RXNE;
+			//xDWINPortEventPost(DWIN_EV_FRAME_RECEIVED);
+		}
+}
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
 	 if (huart->Instance == DWIN_uart->Instance)
 		{
-				CMSIS_DMA_Config(DWIN_dma, &(DWIN_uart->Instance->DR), (uint32_t*)ucDWINBuf, 3);
-				DWIN_uart->Instance->SR &= ~USART_SR_RXNE;
+				//CMSIS_DMA_Config(DWIN_dma, &(DWIN_uart->Instance->DR), (uint32_t*)ucDWINBuf, 3);
+				//DWIN_uart->Instance->SR &= ~USART_SR_RXNE;
 				//xDWINPortEventPost(DWIN_EV_FRAME_RECEIVED);
 
 		}
@@ -125,6 +149,8 @@ void DMA2_Stream2_IRQHandler(void)
 	}
 }
 
+extern DMA_HandleTypeDef hdma_usart1_tx;
+
 void DMA2_Stream7_IRQHandler(void)
 {
 	eDWINEventType xEvent;
@@ -136,28 +162,15 @@ void DMA2_Stream7_IRQHandler(void)
 	//if (xEvent == DWIN_EV_EXECUTE) {
 	xDWINPortEventPost(DWIN_EV_FRAME_SENT);
 	//}
-	
+	#if 0
 	if (DMA2->HISR & DMA_HISR_TCIF7){
 		DMA2->HIFCR |= DMA_HIFCR_CTCIF7;
 		DMA2->HIFCR |= DMA_HIFCR_CHTIF7;
 	
 		while (!(DWIN_uart->Instance->SR & USART_SR_TC));
 	}
-	
-	#if 0
-	if (((DWIN_uart->Instance->SR & USART_SR_TC) != RESET) 
-				&& ((DWIN_uart->Instance->CR1 & USART_CR1_TCIE) != RESET))
-  {
-		__HAL_UART_DISABLE_IT(DWIN_uart, UART_IT_TC);
-
-		/* Tx process is ended, restore huart->gState to Ready */
-		DWIN_uart->gState = HAL_UART_STATE_READY;
-		
-		HAL_UART_TxCpltCallback(DWIN_uart);
-  }
 	#endif
-	//DMA2->HIFCR |= DMA_HIFCR_CFEIF7;
-	//DWIN_uart->Instance->SR &= ~USART_SR_TC;
+	HAL_DMA_IRQHandler(&hdma_usart1_tx);
 }
 
 #endif

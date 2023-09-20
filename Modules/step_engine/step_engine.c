@@ -6,8 +6,8 @@ t_step_engine step_engine;
 uint8_t start=0;
 
 
-extern TIM_HandleTypeDef htim2;
-extern TIM_HandleTypeDef htim3;
+//extern TIM_HandleTypeDef htim2;
+//extern TIM_HandleTypeDef htim3;
 extern DMA_HandleTypeDef hdma_tim1_ch4_trig_com;
 
 extern uint8_t is_start_pos;
@@ -20,7 +20,7 @@ extern uint8_t is_start_pos;
 
 void init_step_engine(t_step_engine* step_eng) {
 	TIM2->CNT = 2147483647;
-	HAL_TIM_OC_Start_IT(&htim2, TIM_CHANNEL_1);
+	HAL_TIM_OC_Start_IT((*step_eng).engine_TIM_slave, TIM_CHANNEL_1);
 	
 	int t=0;
 	float tnext;

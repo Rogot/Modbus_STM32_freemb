@@ -157,7 +157,13 @@ void move_start_pos(t_control* comtrl) {
 */
 void eHMIPoll(t_control* comtrl, int* usRegBuf) {
 	
+	#if MODBUS_ENABLE
 	refresh_reg(comtrl, usRegBuf);
+	#endif
+	
+	#if DWIN_SERIAL_PORT_ENABLE
+	refresh_reg_DWIN(comtrl, (USHORT*)usRegBuf);
+	#endif
 	
 	#if STEP_ENGINE_ENABLE
 	if( comtrl->is_manual == 0x01 && comtrl->is_launch == 0x00
@@ -187,6 +193,41 @@ void eHMIPoll(t_control* comtrl, int* usRegBuf) {
 		refresh_prog_parameters_FLASH(comtrl);
 	}
 	#endif
+}
+
+/*
+* @bref: function for refresh struct parameters for HMI
+* @param comtrl - all parameters for controlling by HMI
+* @param usRegBuf - MODBUS buffer pointer
+*/
+void refresh_reg_DWIN(t_control* comtrl, USHORT* usRegBuf) {
+	
+	if (comtrl->dev->step_engine->mode != STOP){
+		usRegBuf[LAUNCH_PROGRAM] = 0x0;
+	}
+	
+	comtrl->save_prog = usRegBuf[SAVE_PROGRAM];
+	comtrl->start_pos_step_engine = usRegBuf[STEP_ENGINE_START_POS_MS];
+	
+	comtrl->is_launch = usRegBuf[LAUNCH_PROGRAM];
+	comtrl->is_manual = usRegBuf[STEP_ENGINE_ON_MC];
+	
+	comtrl->current_vel = usRegBuf[STEP_ENGINE_VEL_MC];
+	comtrl->current_pos = usRegBuf[STEP_ENGINE_POS_MC];
+	
+	comtrl->programms[comtrl->exe_prog].vel[0] = usRegBuf[STAGE_1_VEL];
+	comtrl->programms[comtrl->exe_prog].vel[1] = usRegBuf[STAGE_2_VEL];
+	comtrl->programms[comtrl->exe_prog].vel[2] = usRegBuf[STAGE_3_VEL];
+
+	comtrl->programms[comtrl->exe_prog].moving[0] = (int16_t)usRegBuf[STAGE_1_POS];
+	comtrl->programms[comtrl->exe_prog].moving[1] = (int16_t)usRegBuf[STAGE_2_POS];
+	comtrl->programms[comtrl->exe_prog].moving[2] = (int16_t)usRegBuf[STAGE_3_POS];
+	
+	comtrl->exe_prog = usRegBuf[NUM_EXE_PROGRAM] - 1;
+	
+	comtrl->dev->step_engine->manual_move_left = (uint8_t)usRegBuf[STEP_ENGINE_MOVE_LEFT];
+	comtrl->dev->step_engine->manual_move_right = (uint8_t)usRegBuf[STEP_ENGINE_MOVE_RIGHT];
+	
 }
 
 /*

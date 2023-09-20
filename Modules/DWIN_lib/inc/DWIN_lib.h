@@ -125,7 +125,7 @@ typedef void    ( *pvDWINFrameStart ) ( void );
 typedef void    ( *pvDWINFrameStop ) ( void );
 
 typedef eDWINErrorCode( *peDWINFrameReceive ) ( UCHAR * pucRcvAddress,
-                                            UCHAR ** pucFrame,
+                                            UCHAR * pucFrame,
                                             USHORT * pusLength, eDWINEventType * evType );
 
 typedef eDWINErrorCode( *peDWINFrameSend ) ( UCHAR slaveAddress,
@@ -144,7 +144,7 @@ void eDWINStop( void );
 																				 
 void eDWINClose( void );		
 																				 
-eDWINErrorCode eDWINReceive( UCHAR * pucRcvAddress, UCHAR ** pucFrame, USHORT * pusLength, eDWINEventType * evType );
+eDWINErrorCode eDWINReceive( UCHAR * pucRcvAddress, UCHAR * pucFrame, USHORT * pusLength, eDWINEventType * evType );
 												 
 eDWINErrorCode eDWINSend( UCHAR slaveAddress, const UCHAR * pucFrame, USHORT usLength );
 
