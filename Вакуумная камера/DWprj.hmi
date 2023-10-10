@@ -2,13 +2,15 @@
 PICFIX=1
 VARCount=64
 Version=-1
-ProVersion=641
+ProVersion=645
 SCREENDSIZE=800X480
 SPADDRESS=5000
+[CMD]
+CMD0=0D0A=Line break
 [IMG]
 0=0_Главное_меню.png
 1=1_Меню_Температура.png
 2=2_Меню_Ручное.png
 3=3_Меню_Технолог.png
 4=4_Клавиатура.png
-5=5_Меню_Технолог_2.png
+8=8_Универсальная_Клавиатура.png
