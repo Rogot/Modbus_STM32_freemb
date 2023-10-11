@@ -13,6 +13,8 @@
 /* ----------------------- Defines ------------------------------------------*/
 #define DWIN_HMI_PACKET_DATA_SIZE		 248
 #define DWIN_ADDR_START_DATA					3
+#define DWIN_ADDR_START_DATA_POS			DWIN_ADDR_START_DATA + 4
+#define DWIN_ADDR_START_DATA_LEN			DWIN_ADDR_START_DATA + 3
 #define DWIN_CRC_ENABLE							( 0 )
 
 #define DWIN_ADDRESS_BROADCAST    	( 0 )   /*! Modbus broadcast address. */
@@ -125,7 +127,7 @@ typedef void    ( *pvDWINFrameStart ) ( void );
 typedef void    ( *pvDWINFrameStop ) ( void );
 
 typedef eDWINErrorCode( *peDWINFrameReceive ) ( UCHAR * pucRcvAddress,
-                                            UCHAR ** pucFrame,
+                                            UCHAR * pucFrame,
                                             USHORT * pusLength, eDWINEventType * evType );
 
 typedef eDWINErrorCode( *peDWINFrameSend ) ( UCHAR slaveAddress,
@@ -144,7 +146,7 @@ void eDWINStop( void );
 																				 
 void eDWINClose( void );		
 																				 
-eDWINErrorCode eDWINReceive( UCHAR * pucRcvAddress, UCHAR ** pucFrame, USHORT * pusLength, eDWINEventType * evType );
+eDWINErrorCode eDWINReceive( UCHAR * pucRcvAddress, UCHAR * pucFrame, USHORT * pusLength, eDWINEventType * evType );
 												 
 eDWINErrorCode eDWINSend( UCHAR slaveAddress, const UCHAR * pucFrame, USHORT usLength );
 
@@ -176,6 +178,6 @@ BOOL xDWINSetQueue( void );
 /* ----------------------- Handle functions -----------------------------*/
 void eDWINFuncReadRegister(UCHAR * pucFrame, USHORT * registers, USHORT * usLen);
 
-void eDWINFuncWriteRegister(UCHAR * pucFrame, USHORT * registers, USHORT * usLen);
+void eDWINFuncWriteRegister(UCHAR * pucFrame, int * registers, USHORT * usLen);
 
 #endif	//DWIN_LIB_H

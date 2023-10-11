@@ -1,9 +1,9 @@
 #include "hmi_interface.h"
 #include <stdlib.h>
 
+extern prog_dscrptr pr_dscr;
 t_hmi_reg programs[MAX_PRGRMS_NUM];
 t_control ctrl;
-extern t_step_engine step_engine;
 extern uint8_t is_start_pos;
 t_hmi_reg* current_program;
 
@@ -80,10 +80,10 @@ void execute_program(t_control* comtrl) {
 					if (comtrl->programms[comtrl->exe_prog].vel[i] > MAX_VEL_PROG) {
 						comtrl->programms[comtrl->exe_prog].vel[i] = MAX_VEL_PROG;
 					}
-					move_step_engine(comtrl->dev->step_engine, 
+					move_step_engine(&comtrl->dev->step_engine[i], 
 						calc_steps(comtrl->programms[comtrl->exe_prog].moving[i]), (float)(
 						(float)comtrl->programms[comtrl->exe_prog].vel[i] / BASE_FREQ / ANFLE_ONE_STEP * 2 ));
-				//while(comtrl->dev->step_engine->mode != STOP);
+				while(comtrl->dev->step_engine->mode != STOP);
 				}
 			}				
 		#endif
@@ -151,13 +151,15 @@ void move_start_pos(t_control* comtrl) {
 }
 
 /*
-* @bref: "home" position of coordinate
+* @bref: main loop for control HMI request
 *	@param (comtrl) - all parameters for controlling by HMI
 *	@param (usRegBuf) - MODBUS array
 */
 void eHMIPoll(t_control* comtrl, int* usRegBuf) {
 	
 	refresh_reg(comtrl, usRegBuf);
+	
+	proccesing_HMI_request();
 	
 	#if STEP_ENGINE_ENABLE
 	if( comtrl->is_manual == 0x01 && comtrl->is_launch == 0x00
@@ -188,6 +190,44 @@ void eHMIPoll(t_control* comtrl, int* usRegBuf) {
 	}
 	#endif
 }
+
+#if MODBUS_ENABLE
+/*
+* @bref: function for refresh struct parameters for HMI
+* @param comtrl - all parameters for controlling by HMI
+* @param usRegBuf - MODBUS buffer pointer
+*/
+void refresh_reg_DWIN(t_control* comtrl, USHORT* usRegBuf) {
+	
+	if (comtrl->dev->step_engine->mode != STOP){
+		usRegBuf[LAUNCH_PROGRAM] = 0x0;
+	}
+	
+	comtrl->save_prog = usRegBuf[SAVE_PROGRAM];
+	comtrl->start_pos_step_engine = usRegBuf[STEP_ENGINE_START_POS_MS];
+	
+	comtrl->is_launch = usRegBuf[LAUNCH_PROGRAM];
+	comtrl->is_manual = usRegBuf[STEP_ENGINE_ON_MC];
+	
+	comtrl->current_vel = usRegBuf[STEP_ENGINE_VEL_MC];
+	comtrl->current_pos = usRegBuf[STEP_ENGINE_POS_MC];
+	
+	comtrl->programms[comtrl->exe_prog].vel[0] = (float)usRegBuf[STAGE_1_VEL];
+	comtrl->programms[comtrl->exe_prog].vel[1] = (float)usRegBuf[STAGE_2_VEL];
+	comtrl->programms[comtrl->exe_prog].vel[2] = (float)usRegBuf[STAGE_3_VEL];
+
+	comtrl->programms[comtrl->exe_prog].moving[0] = (int16_t)usRegBuf[STAGE_1_POS];
+	comtrl->programms[comtrl->exe_prog].moving[1] = (int16_t)usRegBuf[STAGE_2_POS];
+	comtrl->programms[comtrl->exe_prog].moving[2] = (int16_t)usRegBuf[STAGE_3_POS];
+	
+	comtrl->exe_prog = usRegBuf[NUM_EXE_PROGRAM] - 1;
+	
+	comtrl->dev->step_engine->manual_move_left = (uint8_t)usRegBuf[STEP_ENGINE_MOVE_LEFT];
+	comtrl->dev->step_engine->manual_move_right = (uint8_t)usRegBuf[STEP_ENGINE_MOVE_RIGHT];
+	
+}
+#endif
+
 
 /*
 * @bref: function for refresh struct parameters for HMI
@@ -224,12 +264,16 @@ void refresh_reg(t_control* comtrl, int* usRegBuf) {
 	
 }
 
+
+
 /*
 * @bref: inital function for HMI
 * @param comtrl - all parameters for controlling by HMI
 */
 void init_HMI(t_control* comtrl) {
-/*
+	
+	comtrl->exe_prog = 0x01;
+	/*
 	comtrl->programms[0].mixing_speed = 0x33;
 	comtrl->programms[0].mixing_time= 0x34;
 	comtrl->programms[0].vacuum_time = 0x35;
@@ -260,15 +304,15 @@ void search_home(t_control* comtrl) {
 		move_step_engine(comtrl->dev->step_engine, 
 					2, (float)((float)50 / (float)2550));
 	}
-	step_engine.engine_TIM_slave->Instance->CCR1 = step_engine.engine_TIM_slave->Instance->CNT 
-								+ step_engine.dir * step_engine.slowdownCNT;
-	step_engine.mode = SLOWDOWN;
+	comtrl->dev->step_engine->engine_TIM_slave->Instance->CCR1 = comtrl->dev->step_engine->engine_TIM_slave->Instance->CNT 
+								+ comtrl->dev->step_engine->dir * comtrl->dev->step_engine->slowdownCNT;
+	comtrl->dev->step_engine->mode = SLOWDOWN;
 				
-	HAL_DMA_Start_IT(step_engine.engine_TIM_master->hdma[TIM_DMA_ID_UPDATE], 
-				(uint32_t)(step_engine.slowdownbuf 
-								+ step_engine.accel_size - step_engine.slowdownCNT),
-				(uint32_t)&step_engine.engine_TIM_master->Instance->ARR, step_engine.slowdownCNT);
+	HAL_DMA_Start_IT(comtrl->dev->step_engine->engine_TIM_master->hdma[TIM_DMA_ID_UPDATE], 
+				(uint32_t)(comtrl->dev->step_engine->slowdownbuf 
+								+ comtrl->dev->step_engine->accel_size - comtrl->dev->step_engine->slowdownCNT),
+				(uint32_t)&comtrl->dev->step_engine->engine_TIM_master->Instance->ARR, comtrl->dev->step_engine->slowdownCNT);
 				
-	__HAL_TIM_ENABLE_DMA(step_engine.engine_TIM_master, TIM_DMA_UPDATE);
+	__HAL_TIM_ENABLE_DMA(comtrl->dev->step_engine->engine_TIM_master, TIM_DMA_UPDATE);
 	
 }

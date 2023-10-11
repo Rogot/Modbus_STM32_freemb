@@ -3,17 +3,15 @@
 
 #include <stm32f405xx.h>
 
-#define DWIN_SERIAL_PORT_ENABLE			( 1 )
-
 #define DAC_ENABLE									( 1 )
 
 #define DMA_ENABLE									( 1 )
 
-#define DWIN_USART_ENABLE						( 1 )
-
 #define DATA_USART2_TX							( 0 )
 
 #define MODBUS_ENABLE								( 0 ) 
+
+#define DWIN_SERIAL_PORT_ENABLE			( 1 )
 
 #define STEP_ENGINE_ENABLE		 			( 1 )
 

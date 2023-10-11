@@ -2,6 +2,7 @@
 #define HMI_INTERFACE_H
 
 #include <stm32f405xx.h>
+#include "proc_func.h"
 #include "flash_cmsis.h"
 #include "step_engine.h"
 #include <string.h>
@@ -89,12 +90,14 @@ typedef struct CONTROL {
 uint8_t write_program(t_hmi_reg* prog, uint16_t num);
 void read_program(t_hmi_reg* program, uint8_t num);
 void execute_program(t_control* comtrl);
-void refresh_reg(t_control* comtrl, int* usRegBuf);
 void load_prog_FLASH(t_control* comtrl);
 void munual_mode(t_control* comtrl);
 void init_HMI(t_control* comtrl);
 void refresh_prog_parameters_FLASH(t_control* comtrl);
 void move_start_pos(t_control* comtrl);
+
+void refresh_reg(t_control* comtrl, int* usRegBuf);
+void refresh_reg_DWIN(t_control* comtrl, USHORT* usRegBuf);
 
 void search_home();
 
