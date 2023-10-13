@@ -1,8 +1,8 @@
 #include "step_engine.h"
-
+#include "hmi_interface.h"
 /* VARIABLES BEGIN */
 t_step_engine step_engines[2];
-
+extern t_control ctrl;
 uint8_t start=0;
 
 
@@ -203,10 +203,13 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 			}
     	else
     	if((*step_eng).mode == SLOWDOWN){
+    		if (!(*step_eng).manual_mode || (*step_eng).start_pose_mode) {
+    			ctrl.programms->state = STATE_READ_COMMAND;
+    		}
     		HAL_TIM_OC_Stop((*step_eng).engine_TIM_master, TIM_CHANNEL_3);
-				HAL_DMA_Abort_IT((*step_eng).engine_TIM_master->hdma[TIM_DMA_ID_UPDATE]);
+			HAL_DMA_Abort_IT((*step_eng).engine_TIM_master->hdma[TIM_DMA_ID_UPDATE]);
     		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_SET);
-				(*step_eng).mode = STOP;
+			(*step_eng).mode = STOP;
     	}
     }
 }

@@ -61,16 +61,6 @@
 
 #define START_POS_LOCALITY					( 48 )
 
-typedef struct HMI_REGISTERS {
-	uint16_t mixing_speed;
-	uint16_t mixing_time;
-	uint16_t vacuum_time;
-	uint16_t air_pubping_lvl;
-	int16_t moving[STEPS_NUM];
-	float vel[STEPS_NUM];
-	uint16_t transfus_angl;
-}t_hmi_reg;
-
 typedef struct DEVICES {
 	t_step_engine* step_engine;
 } t_devices;
@@ -80,16 +70,16 @@ typedef struct CONTROL {
 	uint16_t is_manual;
 	float current_vel;
 	int16_t current_pos;
-	t_hmi_reg* programms;
+	prog_dscrptr* programms;
 	t_devices* dev;
 	uint8_t exe_prog;
 	uint8_t save_prog;
 	uint8_t start_pos_step_engine;
 } t_control;
 
-uint8_t write_program(t_hmi_reg* prog, uint16_t num);
-void read_program(t_hmi_reg* program, uint8_t num);
-void execute_program(t_control* comtrl);
+uint8_t write_program(prog_dscrptr* prog, uint16_t num);
+void read_program(prog_dscrptr* program, uint8_t num);
+void move_SE(t_control* comtrl, uint8_t num);
 void load_prog_FLASH(t_control* comtrl);
 void munual_mode(t_control* comtrl);
 void init_HMI(t_control* comtrl);
@@ -97,7 +87,6 @@ void refresh_prog_parameters_FLASH(t_control* comtrl);
 void move_start_pos(t_control* comtrl);
 
 void refresh_reg(t_control* comtrl, int* usRegBuf);
-void refresh_reg_DWIN(t_control* comtrl, USHORT* usRegBuf);
 
 void search_home();
 

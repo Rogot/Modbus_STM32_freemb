@@ -5,8 +5,10 @@
 #include "stm32f4xx_hal.h"
 #include <stdio.h>
 #include "math.h"
-//#include "mbport.h"
+
 #include "config_DWIN.h"
+
+#include "proc_func.h"
 
 /* DEFINE BEGIN */
 
@@ -15,12 +17,13 @@
 #define DECEL_TIME_SEC 							1.0
 #define ACCEL_TIME 							  	(ACCEL_TIME_SEC*BASE_FREQ)
 #define DECEL_TIME 									DECEL_TIME_SEC*BASE_FREQ
-#define ACCEL 											0.000000001	
 #define SPEED_MIN								  	10.0/65535
 #define SPEED_MAX 									0.1
 
 #define ANFLE_ONE_STEP							0.9
 #define TOGGLE_DIVIDER							2
+
+#define RATIO_GEARBOX							28
 
 #define STOP 1
 #define SPEEDUP 2
