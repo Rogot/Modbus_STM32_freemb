@@ -19,7 +19,7 @@ extern uint8_t is_start_pos;
 */
 
 void init_step_engine(t_step_engine* step_eng) {
-	TIM2->CNT = 2147483647;
+	(*step_eng).engine_TIM_slave->Instance->CNT = 2147483647;
 	HAL_TIM_OC_Start_IT((*step_eng).engine_TIM_slave, TIM_CHANNEL_1);
 	
 	int t=0;

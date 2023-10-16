@@ -78,7 +78,7 @@ void move_SE(t_control* comtrl, uint8_t num) {
 			comtrl->programms->state = STATE_BUSY_COMMAND;
 			move_step_engine(&comtrl->dev->step_engine[num],
 					calc_steps(comtrl->programms->par1) * RATIO_GEARBOX,
-					(float) ((float) comtrl->programms->par2 / BASE_FREQ
+					(float) ((float) comtrl->programms->par2 * RATIO_GEARBOX / BASE_FREQ
 							/ ANFLE_ONE_STEP * 2));
 		}
 		/* Legasy code */
@@ -221,10 +221,6 @@ void eHMIPoll(t_control* comtrl, int* usRegBuf) {
 * @param usRegBuf - MODBUS buffer pointer
 */
 void refresh_reg(t_control* comtrl, int* usRegBuf) {
-	
-	if (comtrl->dev->step_engine->mode != STOP){
-		usRegBuf[LAUNCH_PROGRAM] = 0x0;
-	}
 	
 	comtrl->save_prog = usRegBuf[SAVE_PROGRAM];
 	comtrl->start_pos_step_engine = usRegBuf[STEP_ENGINE_START_POS_MS];
