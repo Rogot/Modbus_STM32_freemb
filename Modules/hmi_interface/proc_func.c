@@ -13,11 +13,13 @@ void proccesing_HMI_request(prog_dscrptr* pd) {
 
 	pd->state = parser(pd->usDataRx, &pd->com_dscr, &pd->read_cnt, pd->size);
 
+	/* TEST strcmp() */
 	/*
 	int rc = strcmp(pd->com_dscr.name, "#PR");
 	const char *rel = rc < 0 ? "precedes" : rc > 0 ? "follows" : "equals";
 	printf("[%s] %s [%s]\n", pd->com_dscr.name, rel, "#PR");
 	 */
+
 	if (pd->state != STATE_IDLE_COMMAND) {
 		if(strcmp(pd->com_dscr.name, "#PR") == 0) {
 			copy(pd->com_dscr.p1, pd->prog_name, MAX_SIZE_PARAMETR);

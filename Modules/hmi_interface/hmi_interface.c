@@ -73,7 +73,7 @@ void move_SE(t_control* comtrl, uint8_t num) {
 		#endif
 
 		#if !STEP_ENGINE_TEST_ENABLE
-		if (comtrl->is_manual == 0x00&& comtrl->is_launch == 0x01
+		if (comtrl->is_manual == 0x00 && comtrl->is_launch == 0x01
 		&& comtrl->dev->step_engine->mode == STOP) {
 			comtrl->programms->state = STATE_BUSY_COMMAND;
 			move_step_engine(&comtrl->dev->step_engine[num],
@@ -81,6 +81,7 @@ void move_SE(t_control* comtrl, uint8_t num) {
 					(float) ((float) comtrl->programms->par2 / BASE_FREQ
 							/ ANFLE_ONE_STEP * 2));
 		}
+		/* Legasy code */
 		/*
 		for (uint8_t i = 0; i < STAGE_NUM; i++) {
 			if (comtrl->programms[comtrl->exe_prog].vel[i] != 0x00) {

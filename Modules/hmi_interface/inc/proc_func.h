@@ -35,9 +35,9 @@ typedef struct PROGRAM_DISCCR
 	uint8_t usDataRx[DATA_RX_MAX_SIZE];		/* Buffer with RX data from serial port */
 	command_dscrptr com_dscr;				/* symbolic command parameters */
 	uint8_t prog_name[MAX_SIZE_PARAMETR];
-	uint16_t par1;  						/* numeric parameters */
-	uint16_t par2;							/* numeric parameters */
-	uint16_t par3;							/* numeric parameters */
+	int16_t par1;  							/* numeric parameters */
+	int16_t par2;							/* numeric parameters */
+	int16_t par3;							/* numeric parameters */
 	uint8_t read_cnt;
 	uint8_t size;
 	eProcState state;

@@ -88,11 +88,11 @@ void move_step_engine(t_step_engine* step_eng, int16_t pos, float vel) {
 	if ((*step_eng).cnt < 0 || (*step_eng).manual_move_right) {
 		(*step_eng).cnt = -((*step_eng).cnt);
 		(*step_eng).dir = -1;
-		TIM2->CR1|=TIM_CR1_DIR;
+		(*step_eng).engine_TIM_slave->Instance->CR1|=TIM_CR1_DIR;
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET);
 	} else if ((*step_eng).cnt >= 0 || (*step_eng).manual_move_left) {
 		(*step_eng).dir = 1;
-		TIM2->CR1&=~(TIM_CR1_DIR);
+		(*step_eng).engine_TIM_slave->Instance->CR1 &= ~(TIM_CR1_DIR);
 		HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET);
 	}
 	
@@ -196,6 +196,9 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 					
 					__HAL_TIM_ENABLE_DMA((*step_eng).engine_TIM_master, TIM_DMA_UPDATE);
 				} else {
+					if (!(*step_eng).manual_mode || (*step_eng).start_pose_mode) {
+						ctrl.programms->state = STATE_READ_COMMAND;
+					}
 					HAL_TIM_OC_Stop((*step_eng).engine_TIM_master, TIM_CHANNEL_3);
 					(*step_eng).mode = STOP;
 					HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_SET);
