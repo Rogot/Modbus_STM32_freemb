@@ -11,27 +11,27 @@
 #include "DWIN_addr_conv.h"
 
 /* ----------------------- Defines ------------------------------------------*/
-#define DWIN_HMI_PACKET_DATA_SIZE		 248
-#define DWIN_ADDR_START_DATA					3
+#define DWIN_HMI_PACKET_DATA_SIZE			248
+#define DWIN_ADDR_START_DATA				3
 #define DWIN_ADDR_START_DATA_POS			DWIN_ADDR_START_DATA + 4
 #define DWIN_ADDR_START_DATA_LEN			DWIN_ADDR_START_DATA + 3
-#define DWIN_CRC_ENABLE							( 0 )
+#define DWIN_CRC_ENABLE						( 0 )
 
-#define DWIN_ADDRESS_BROADCAST    	( 0 )   /*! Modbus broadcast address. */
-#define DWIN_ADDRESS_MIN          	( 1 )   /*! Smallest possible slave address. */
-#define DWIN_ADDRESS_MAX          	( 247 ) /*! Biggest possible slave address. */
+#define DWIN_ADDRESS_BROADCAST    			( 0 )   /*! Modbus broadcast address. */
+#define DWIN_ADDRESS_MIN          			( 1 )   /*! Smallest possible slave address. */
+#define DWIN_ADDRESS_MAX          			( 247 ) /*! Biggest possible slave address. */
 #define DWIN_SER_PDU_SIZE_MAX				( 256 )
 
-#define DWIN_START_BIT							( 0x5A )
+#define DWIN_START_BIT						( 0x5A )
 
-#define DWIN_START_POS							( 0 )
-#define DWIN_SLAVE_ID_POS						( 1 )
+#define DWIN_START_POS						( 0 )
+#define DWIN_SLAVE_ID_POS					( 1 )
 #define DWIN_WORD_LENGTH_POS				( 2 )
-#define DWIN_CMD_POS								( 3 )
+#define DWIN_CMD_POS						( 3 )
 
 
-#define TRUE            1
-#define FALSE           0
+#define TRUE            					1
+#define FALSE           					0
 
 typedef uint8_t BOOL;
 

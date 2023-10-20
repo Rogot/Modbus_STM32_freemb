@@ -27,9 +27,11 @@ void proccesing_HMI_request(prog_dscrptr* pd) {
 		} else if (strcmp(pd->com_dscr.name, "AX1") == 0) {
 			pd->par1 = atoi(pd->com_dscr.p1);
 			pd->par2 = atoi(pd->com_dscr.p2);
-		}	else if (strcmp(pd->com_dscr.name, "AX2") == 0) {
+		} else if (strcmp(pd->com_dscr.name, "AX2") == 0) {
 			pd->par1 = atoi(pd->com_dscr.p1);
 			pd->par2 = atoi(pd->com_dscr.p2);
+		} else if (strcmp(pd->com_dscr.name, "MIX") == 0) {
+			pd->par1 = atoi(pd->com_dscr.p1);
 		}
 	}
 }

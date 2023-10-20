@@ -19,7 +19,8 @@ extern uint8_t is_start_pos;
 */
 
 void init_step_engine(t_step_engine* step_eng) {
-	(*step_eng).engine_TIM_slave->Instance->CNT = 2147483647;
+	(*step_eng).engine_TIM_slave->Instance->CNT = START_POS_VALUE;
+	(*step_eng).engine_TIM_slave->Instance->CCR1 = START_POS_VALUE;
 	HAL_TIM_OC_Start_IT((*step_eng).engine_TIM_slave, TIM_CHANNEL_1);
 	
 	int t=0;
@@ -129,7 +130,7 @@ void move_step_engine(t_step_engine* step_eng, int16_t pos, float vel) {
 	 }
 	 
 	 if ((*step_eng).speedupCNT == 0x0) {
-			TIM3->ARR = 1 / (*step_eng).vel;
+		 (*step_eng).engine_TIM_master->Instance->ARR = 1 / (*step_eng).vel;
 		 (*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT 
 																						+ (*step_eng).dir * (*step_eng).runCNT;
 		 (*step_eng).mode = RUN;
@@ -179,7 +180,7 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 						(*step_eng).mode = RUN;
 					}
 				}
-				TIM3->ARR = (uint16_t) 1 / (*step_eng).vel;
+    			(*step_eng).engine_TIM_master->Instance->ARR = (uint16_t) 1 / (*step_eng).vel;
     	}
     	else
     	if((*step_eng).mode == RUN){

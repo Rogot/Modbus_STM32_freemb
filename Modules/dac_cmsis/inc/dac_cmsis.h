@@ -14,7 +14,9 @@ typedef struct DAC_CMSIS {
 
 void CMSIS_DAC_init(t_dac* dac);
 
-void TIM_init(TIM_TypeDef* tim, uint16_t psc, uint16_t arr);
+void CMSIS_GPIO_init(void);
+
+void CMSIS_TIM_init(TIM_TypeDef* tim, uint16_t psc, uint16_t arr);
 
 
 #endif //!DAC_CMSIS_H

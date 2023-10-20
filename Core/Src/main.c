@@ -74,6 +74,9 @@ extern uint8_t start;
 extern uint8_t print;
 extern t_step_engine step_engines[2];
 
+t_dac dac;
+t_bldc_engine bldc_engine;
+
 #if MODBUS_ENABLE
 extern t_modbus_him_pack rxData;
 extern t_modbus_him_pack txData;
@@ -93,7 +96,6 @@ extern volatile USHORT  ucRegistersBuf[DWIN_SER_PDU_SIZE_MAX];
 extern volatile UCHAR  ucDWINBuf[DWIN_SER_PDU_SIZE_MAX];
 #endif 
 extern uint16_t in_count;
-t_dac dac;
 uint8_t is_start_pos = 0x0;
 
 t_devices dev;
@@ -221,17 +223,23 @@ int main(void)
 	
 	init_step_engine(&step_engines[1]);
 	#endif
+
+	#if BLDC_ENGINE_ENABLE
+	bldc_engine.power = 0;
+	dev.bldc_engine = &bldc_engine;
+	bldc_engine.dac = &dac;
+	#endif
 	
 	#if DAC_ENABLE
 	/* DAC init */
 	dac.tim = TIM6;
 	dac.dac_type = DAC;
 	dac.tim_presc = 719;
-	dac.tim_arr = 5;
+	dac.tim_arr = 7;
 	CMSIS_DAC_init(&dac);
 	uint16_t a;
 	#endif
-	
+
 	#if DWIN_SERIAL_PORT_ENABLE
 
 	DWIN_PORT_SetUartModule(&huart1);
@@ -245,7 +253,7 @@ int main(void)
 	// Error handling
 	}
 	#endif
-	
+
 	//HAL_UARTEx_ReceiveToIdle_IT(&huart1, (uint8_t *)ucDWINBuf, DWIN_SER_PDU_SIZE_MAX);
 	HAL_ADC_Start_IT(&hadc1);
 	HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_1);
@@ -264,8 +272,12 @@ int main(void)
 			#endif		
 		
 			#if DAC_ENABLE
-			//dac.dac_type->DHR12R1 = a;
-			//a++;
+			/*if (a > 4096){
+				a = 0;
+			}
+			dac.dac_type->DHR12R1 = a;
+			a++;
+			*/
 			#endif
 		
 			#if MODBUS_ENABLE

@@ -2,6 +2,7 @@
 #define HMI_INTERFACE_H
 
 #include <stm32f405xx.h>
+#include "bldc_motors.h"
 #include "proc_func.h"
 #include "flash_cmsis.h"
 #include "step_engine.h"
@@ -53,7 +54,7 @@
 #define STAGE_3_VEL									( 16 )		 		/* 5046 */
 #define STAGE_3_DEL									( 17 )		 		/* 5048 */
 
-#define TRANSFUSE_ANGLE							( 18 )		 		/* 5020 */
+#define TRANSFUSE_ANGLE								( 18 )		 		/* 5020 */
 #define MIXING_TIME									( 19 )		 		/* 5022 */
 #define VACUUM_TIME									( 20 )		 		/* 5024 */
 
@@ -63,6 +64,7 @@
 
 typedef struct DEVICES {
 	t_step_engine* step_engine;
+	t_bldc_engine* bldc_engine;
 } t_devices;
 
 typedef struct CONTROL {
@@ -80,11 +82,13 @@ typedef struct CONTROL {
 uint8_t write_program(prog_dscrptr* prog, uint16_t num);
 void read_program(prog_dscrptr* program, uint8_t num);
 void move_SE(t_control* comtrl, uint8_t num);
+void move_SE_to(t_control* comtrl, uint8_t num);
 void load_prog_FLASH(t_control* comtrl);
-void munual_mode(t_control* comtrl);
+void munual_mode(t_control* comtrl, uint8_t num);
 void init_HMI(t_control* comtrl);
 void refresh_prog_parameters_FLASH(t_control* comtrl);
-void move_start_pos(t_control* comtrl);
+void move_start_pos(t_control* comtrl, uint8_t num);
+void control_BLCD(t_control* comtrl);
 
 void refresh_reg(t_control* comtrl, int* usRegBuf);
 

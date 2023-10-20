@@ -7,19 +7,21 @@
 
 #define DMA_ENABLE									( 1 )
 
-#define DATA_USART2_TX							( 0 )
+#define DATA_USART2_TX								( 0 )
 
 #define MODBUS_ENABLE								( 0 ) 
 
-#define DWIN_SERIAL_PORT_ENABLE			( 1 )
+#define DWIN_SERIAL_PORT_ENABLE						( 1 )
 
-#define STEP_ENGINE_ENABLE		 			( 1 )
+#define STEP_ENGINE_ENABLE		 					( 1 )
 
-#define STEP_ENGINE_TEST_ENABLE			( 0 )
+#define STEP_ENGINE_TEST_ENABLE						( 0 )
 
 #define PEREPH_ENABLE								( 1 )
 
-#define HAL_ADC_MODULE_ENABLED			( 1 )
+#define HAL_ADC_MODULE_ENABLED						( 1 )
+
+#define BLDC_ENGINE_ENABLE							( 1 )
 
 typedef uint8_t BOOL;
 

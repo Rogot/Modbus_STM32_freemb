@@ -12,27 +12,30 @@
 
 /* DEFINE BEGIN */
 
-#define BASE_FREQ 									1e+5
+#define START_POS_VALUE							0x7fffffff
+
+#define BASE_FREQ 								1e+5
 #define ACCEL_TIME_SEC 							1.0
 #define DECEL_TIME_SEC 							1.0
 #define ACCEL_TIME 							  	(ACCEL_TIME_SEC*BASE_FREQ)
-#define DECEL_TIME 									DECEL_TIME_SEC*BASE_FREQ
-#define SPEED_MIN								  	10.0/65535
-#define SPEED_MAX 									0.1
+#define DECEL_TIME 								DECEL_TIME_SEC*BASE_FREQ
+#define SPEED_MIN								10.0/65535
+#define SPEED_MAX 								0.1
 
 #define ANFLE_ONE_STEP							0.9
 #define TOGGLE_DIVIDER							2
 
-#define RATIO_GEARBOX							28
+#define STEP_ONE_PULSE							2
+#define RATIO_GEARBOX							14 * STEP_ONE_PULSE
 
-#define STOP 1
-#define SPEEDUP 2
-#define RUN 3
-#define SLOWDOWN 4
+#define STOP 									1
+#define SPEEDUP 								2
+#define RUN 									3
+#define SLOWDOWN 								4
 
 /* DEFINE END */
 
-typedef struct step_engine {
+typedef struct STEP_ENGINE {
 	float vel;
 	float accel;
 	size_t accel_size;
