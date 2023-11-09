@@ -74,6 +74,8 @@ extern uint8_t start;
 extern uint8_t print;
 extern t_step_engine step_engines[2];
 
+
+t_vac_sen vac_sensor;
 t_dac dac;
 t_bldc_engine bldc_engine;
 
@@ -151,7 +153,6 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
-  MX_ADC1_Init();
   MX_TIM1_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
@@ -188,7 +189,6 @@ int main(void)
 	#endif
 	
 	#if PEREPH_ENABLE
-	dev.step_engine = step_engines;
 	
 	ctrl.dev = &dev;
 	ctrl.programms = &pr_dscr;
@@ -202,6 +202,8 @@ int main(void)
 	//DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_TIM3_STOP;
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_SET);
 	
+	dev.step_engine = step_engines;
+
 	/* Initial X-axes step engine */
 	step_engines[0].mode = STOP;
 	step_engines[0].vel = SPEED_MIN;
@@ -222,6 +224,12 @@ int main(void)
 	step_engines[1].engine_TIM_slave = &htim5;
 	
 	init_step_engine(&step_engines[1]);
+	#endif
+
+	#if HAL_ADC_MODULE_ENABLED
+	vac_sensor.setpoint = 0;
+	vac_sensor.adc = &hadc1;
+	dev.vac_sensor = &vac_sensor;
 	#endif
 
 	#if BLDC_ENGINE_ENABLE
@@ -254,10 +262,19 @@ int main(void)
 	}
 	#endif
 
-	//HAL_UARTEx_ReceiveToIdle_IT(&huart1, (uint8_t *)ucDWINBuf, DWIN_SER_PDU_SIZE_MAX);
 	HAL_ADC_Start_IT(&hadc1);
 	HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_1);
-  /* USER CODE END 2 */
+
+	t_ring_buf* ring_buf;
+	t_queue_dicr queue[20];
+
+	t_RING_BUF_ErrorStatus rStatus = ringBuf_init(ring_buf, queue, 20);
+
+	if (rStatus == RING_BUFFER_SUCCESS) {
+		ctrl.queue = ring_buf;
+	}
+
+	/* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
@@ -834,12 +851,15 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
-	
+
 	int value;
-	
+
 	if (hadc->Instance == ADC1) {
-		value = HAL_ADC_GetValue(hadc);
-		dac.dac_type->DHR12R1 = value;
+		//ctrl.dev->vac_sensor->cur_pres = get_value(ctrl.dev->vac_sensor->adc);
+		ctrl.dev->vac_sensor->cur_pres = HAL_ADC_GetValue(hadc);
+		//value = HAL_ADC_GetValue(hadc);
+		//dac.dac_type->DHR12R1 = value;
+		dac.dac_type->DHR12R1 = ctrl.dev->vac_sensor->cur_pres;
 	}
 }
 

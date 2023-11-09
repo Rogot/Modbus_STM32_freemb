@@ -158,7 +158,7 @@ void DMA2_Stream7_IRQHandler(void)
 	//xDWINPortEventGet(&xEvent);
 	
 	//if (xEvent == DWIN_EV_EXECUTE) {
-	xDWINPortEventPost(DWIN_EV_FRAME_SENT);
+	xDWINPortEventPost(DWIN_EV_READY);
 	//}
 	#if 0
 	if (DMA2->HISR & DMA_HISR_TCIF7){

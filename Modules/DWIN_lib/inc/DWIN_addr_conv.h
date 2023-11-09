@@ -4,6 +4,7 @@
 #include <stm32f405xx.h>
 #include "hmi_interface.h"
 
+#define CURRENT_USED_REG_CNT			( 14 )
 #define PLC_ADDR_MAX					( 256 )
 
 typedef struct ADDR_CONV {

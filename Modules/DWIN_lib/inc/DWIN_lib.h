@@ -78,7 +78,8 @@ typedef enum
     DWIN_EV_READY,                   /*!< Startup finished. */
     DWIN_EV_FRAME_RECEIVED,          /*!< Start frame received. */
     DWIN_EV_EXECUTE,                 /*!< Execute function. */
-    DWIN_EV_FRAME_SENT               /*!< Frame sent. */
+    DWIN_EV_FRAME_SENT,              /*!< Frame sent. */
+	DWIN_EV_REQUEST_SENT,			 /*!< Request frame to other device */
 } eDWINEventType;
 
 /*!
@@ -103,7 +104,7 @@ typedef enum
     DWIN_EIO,                     /*!< I/O error. */
     DWIN_EILLSTATE,               /*!< protocol stack in illegal state. */
     DWIN_ETIMEDOUT,               /*!< timeout error occurred. */
-	  DWIN_TX_BUSY,									/*!< Tx is busy */
+	DWIN_TX_BUSY,									/*!< Tx is busy */
 } eDWINErrorCode;
 
 
@@ -150,7 +151,7 @@ eDWINErrorCode eDWINReceive( UCHAR * pucRcvAddress, UCHAR * pucFrame, USHORT * p
 												 
 eDWINErrorCode eDWINSend( UCHAR slaveAddress, const UCHAR * pucFrame, USHORT usLength );
 
-eDWINErrorCode eDWINRequestSend( UCHAR slaveAddress, const UCHAR * pucFrame, USHORT usLength );
+void eDWINRequestSend( UCHAR slaveAddress, const UCHAR * pucFrame, USHORT usLength );
 																				 
 eDWINErrorCode eDWINEnable( void );
 																				 

@@ -10,16 +10,18 @@
 #define MAX_SIZE_PARAMETR								( 10 )
 
 /*********** symbolic defines ***********/
-#define TWO_BYTE_CNTRL_SIGN									( 1 )
-#define NEW_LINE														( 0x0D )
-#define RET_CAR															( 0x0A )
+#define TWO_BYTE_CNTRL_SIGN								( 1 )
+#define NEW_LINE										( 0x0D )
+#define RET_CAR											( 0x0A )
+
 
 typedef enum
 {
-	STATE_IDLE_COMMAND = 0, 						/*!< IDLE rescive command from serial port */
+	STATE_IDLE_COMMAND = 0, 				/*!< IDLE rescive command from serial port */
 	STATE_READ_COMMAND = 1, 				/*!< Read command for proccesing */
 	STATE_EXECUTE_COMMAND = 2, 				/*!< Execute command */
 	STATE_BUSY_COMMAND = 3, 				/*!< Busy */
+	STATE_SAND_REQUEST = 4, 				/*!< Send request to other device */
 } eProcState;
 
 typedef struct COMMAND_DISCR 

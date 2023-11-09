@@ -3,6 +3,7 @@
 /* VARIABLES BEGIN */
 t_step_engine step_engines[2];
 extern t_control ctrl;
+extern uint16_t reqiest_data;
 uint8_t start=0;
 
 
@@ -55,7 +56,7 @@ void init_step_engine(t_step_engine* step_eng) {
 
 /*
 * @bref: calculate movment steps count
-* @param pos - angle for movment
+* @param (pos) - angle for movment
 * @res - num of steps
 */
 int16_t calc_steps(int16_t pos) {
@@ -68,9 +69,9 @@ size_t accel_size;
 
 /*
 * @bref: setting the displacement of the motor shaft
-* @param step_eng - pointer to the step engine which will be controlled
-* @param pos - moving distance
-* @param vel - moving velocity
+* @param (step_eng) - pointer to the step engine which will be controlled
+* @param (pos) - moving distance
+* @param (vel) - moving velocity
 */
 
 void move_step_engine(t_step_engine* step_eng, int16_t pos, float vel) {
@@ -160,27 +161,39 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 			t_step_engine* step_eng = NULL;
 			if (htim->Instance == TIM2) {
 				step_eng = &step_engines[0];
+				if ((*step_eng).mode == SLOWDOWN) {
+					t_queue_dicr disc;
+
+					disc.state = STEP_ENGINE_1_STOPPED;
+					ringBuf_put(disc, ctrl.queue->que_disc);
+				}
 			} else if (htim->Instance == TIM5) {
 				step_eng = &step_engines[1];
+				if ((*step_eng).mode == SLOWDOWN) {
+					t_queue_dicr disc;
+
+					disc.state = STEP_ENGINE_2_STOPPED;
+					ringBuf_put(disc, ctrl.queue->que_disc);
+				}
 			}
 		
     	if((*step_eng).mode == SPEEDUP){
     		if (!(*step_eng).manual_mode || (*step_eng).start_pose_mode) {
-					(*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT 
+				(*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT
 																						+ (*step_eng).dir * (*step_eng).runCNT;
-					(*step_eng).mode = RUN;
-				} else if (is_start_pos) {
-					TIM2->CCR1 = 2147483647;
-					(*step_eng).mode = RUN;
-				}	else {
-					(*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT
+				(*step_eng).mode = RUN;
+			} else if (is_start_pos) {
+				(*step_eng).engine_TIM_slave->Instance->CCR1 = 2147483647;
+				(*step_eng).mode = RUN;
+			}	else {
+				(*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT
 													+ (*step_eng).dir * 10;
 					
-					if (!(*step_eng).manual_move_left && !(*step_eng).manual_move_right) {
-						(*step_eng).mode = RUN;
-					}
+				if (!(*step_eng).manual_move_left && !(*step_eng).manual_move_right) {
+					(*step_eng).mode = RUN;
 				}
-    			(*step_eng).engine_TIM_master->Instance->ARR = (uint16_t) 1 / (*step_eng).vel;
+			}
+    		(*step_eng).engine_TIM_master->Instance->ARR = (uint16_t) 1 / (*step_eng).vel;
     	}
     	else
     	if((*step_eng).mode == RUN){
@@ -207,9 +220,18 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 			}
     	else
     	if((*step_eng).mode == SLOWDOWN){
-    		if (!(*step_eng).manual_mode || (*step_eng).start_pose_mode) {
+    		if (!(*step_eng).manual_mode) {
     			ctrl.programms->state = STATE_READ_COMMAND;
     		}
+    		if ((*step_eng).start_pose_mode) {
+    			t_queue_dicr disc;
+
+    			ctrl.programms->state = STATE_SAND_REQUEST;
+
+    			disc.state = HOME_IS_REACHED;
+    			ringBuf_put(disc, ctrl.queue->que_disc);
+    		}
+
     		HAL_TIM_OC_Stop((*step_eng).engine_TIM_master, TIM_CHANNEL_3);
 			HAL_DMA_Abort_IT((*step_eng).engine_TIM_master->hdma[TIM_DMA_ID_UPDATE]);
     		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_SET);

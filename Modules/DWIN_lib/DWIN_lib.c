@@ -15,19 +15,29 @@ typedef enum
     DWIN_STATE_TX_XMIT               /*!< Transmitter is in transfer state. */
 } eDWINSndState;
 
-/* ----------------------- Static variables ---------------------------------*/
+/* ----------------------- Variables ---------------------------------*/
+UCHAR				tmpSlaveAddress;
+const UCHAR 		* tmpPucFrame;
+USHORT 				tmpUsLength;
+eDWINEventType 		prevEvent;
 
-extern prog_dscrptr pr_dscr;
+
 //extern uint8_t usDataRx[DATA_RX_MAX_SIZE];
 
 //extern t_modbus_him_pack rxData;
 DMA_Stream_TypeDef* DWIN_dma;
 UART_HandleTypeDef* DWIN_uart;
 
+/* ----------------------- Extern variables ---------------------------------*/
+
+extern prog_dscrptr pr_dscr;
+
 extern eDWINEventType eQueuedEvent;
 
 extern t_addr_conv PLC_addr[PLC_ADDR_MAX]; /* PLC address */
 
+
+/* ----------------------- Static variables ---------------------------------*/
 static UCHAR    ucDWINAddress;
 static eDWINMode  eDWINCurrentMode;
 
@@ -51,6 +61,7 @@ static pvDWINFrameStart pvDWINFrameStartCur;
 static pvDWINFrameStop pvDWINFrameStopCur;
 static peDWINFrameReceive peDWINFrameReceiveCur;
 static pvDWINFrameClose pvDWINFrameCloseCur;
+extern peHMISendRequest peHMISendRequestCur;
 
 
 /* Callback functions required by the porting layer. They are called when
@@ -87,6 +98,7 @@ eDWINInit(UCHAR ucSlaveAddress, UCHAR ucPort, ULONG ulBaudRate, eDWINParity ePar
 	} else {
 		ucDWINAddress = ucSlaveAddress;
 		
+		peHMISendRequestCur = eDWINRequestSend;
 		peDWINFrameSendCur = eDWINSend;
 		pvDWINFrameStartCur = eDWINStart;
 		pvDWINFrameStopCur = eDWINStop;
@@ -174,7 +186,7 @@ eDWINErrorCode eDWINSend( UCHAR slaveAddress, const UCHAR * pucFrame, USHORT usL
 	
 		/* First byte before the Modbus-PDU is the slave address. */
 		/* Now copy the Modbus-PDU into the Modbus-Serial-Line-PDU. */
-		uStat = HAL_UART_Transmit_DMA(DWIN_uart, (uint8_t *)ucDWINBuf, usLength);
+		uStat = HAL_UART_Transmit_DMA(DWIN_uart, (uint8_t *)pucFrame, usLength);
 		if (uStat == HAL_BUSY) {
 				return DWIN_TX_BUSY;
 		}
@@ -226,14 +238,14 @@ void eDWINSetSlaveID( void ) {}
 	
 void eDWINFuncReadRegister(UCHAR * pucFrame, USHORT * registers, USHORT * usLen) {
 		USHORT          	usRegAddress;
-    USHORT          	usRegCount;
-    UCHAR          		*pucFrameCur;
-		USHORT 	 					ucLength = 1;
-		USHORT						dataCNT;
+		USHORT          	usRegCount;
+		UCHAR          		*pucFrameCur;
+		USHORT 	 			ucLength = 1;
+		USHORT				dataCNT;
 	
 	
-	  eDWINException    eStatus = DWIN_EX_NONE;
-    eDWINErrorCode    eRegStatus;
+		eDWINException    eStatus = DWIN_EX_NONE;
+		eDWINErrorCode    eRegStatus;
 	
 		while (ucLength < *usLen) {
 			/* read register number */
@@ -262,14 +274,14 @@ void eDWINFuncReadRegister(UCHAR * pucFrame, USHORT * registers, USHORT * usLen)
 */
 void eDWINFuncWriteRegister(UCHAR * pucFrame, int * registers, USHORT * usLen) {
 		USHORT          	usRegAddress;
-    USHORT          	usRegCount;
-    UCHAR          		*pucFrameCur;
+		USHORT          	usRegCount;
+		UCHAR          		*pucFrameCur;
 		USHORT 	 					ucLength = 1;
 		USHORT						dataCNT;
-	
-	  eDWINException    eStatus = DWIN_EX_NONE;
-    eDWINErrorCode    eRegStatus;
 		
+		eDWINException    eStatus = DWIN_EX_NONE;
+		eDWINErrorCode    eRegStatus;
+
 		while (ucLength < *usLen) {
 			/* read register number */
 			usRegAddress = ( USHORT )( pucFrame[DWIN_ADDR_START_DATA + ucLength++] << 8 );
@@ -292,24 +304,52 @@ void eDWINFuncWriteRegister(UCHAR * pucFrame, int * registers, USHORT * usLen) {
 		pucFrame[(*usLen)++] = 0x4B;*/
 }
 
+/*
+* @bref: send a request to other device
+* @param (reg) - programm parameters
+* @param num - number of saved programs
+*/
+void eDWINRequestSend( UCHAR slaveAddress, const UCHAR * pucFrame, USHORT usLength ) {
+	HAL_StatusTypeDef uStat;
+
+	//HAL_UARTEx_ReceiveToIdle_IT(DWIN_uart, (uint8_t*) ucDWINBuf,
+	//	DWIN_SER_PDU_SIZE_MAX);
+	uStat = HAL_UART_Transmit_DMA(DWIN_uart, (uint8_t *)pucFrame, usLength);
+
+	xDWINPortEventGet(&prevEvent);
+
+	/* Wait until we can't send a request.
+	 * After that continue main receive protocol */
+	if (uStat == HAL_BUSY) {
+		tmpSlaveAddress = slaveAddress;
+		tmpPucFrame = pucFrame;
+		tmpUsLength = usLength;
+		xDWINPortEventPost(DWIN_EV_REQUEST_SENT);
+	} else if (uStat != HAL_BUSY) {
+		HAL_UARTEx_ReceiveToIdle_IT(DWIN_uart, (uint8_t*) ucDWINBuf,
+						DWIN_SER_PDU_SIZE_MAX);
+		xDWINPortEventPost(prevEvent);
+	}
+}
 
 /*
 * @bref: main loop for control protocol request
 */
-
+int a;
 eDWINErrorCode eDWINPoll( void ) {
 	static UCHAR*	 ucDWINFrame;
 	static UCHAR	 ucDWINFrame_TX[50];
 	static UCHAR    ucRcvAddress;
-  static UCHAR    ucFunctionCode;
-  static USHORT 	 usLength;
+	static UCHAR    ucFunctionCode;
+	static USHORT 	 usLength;
 	
 	static eDWINException eException;
-  
-	int								i;
+
 	eDWINErrorCode    eStatus = DWIN_ENOERR;
 	eDWINEventType    eDWEvent;
 	
+	HAL_StatusTypeDef status;
+
 	/* Check if the protocol stack is ready. */
 	if( eDWINState != DWIN_STATE_ENABLED )
   {
@@ -321,6 +361,12 @@ eDWINErrorCode eDWINPoll( void ) {
 	if (xDWINPortEventGet(&eDWEvent) == TRUE) {
 		switch (eDWEvent) {
 		case DWIN_EV_READY:
+			status = HAL_UARTEx_ReceiveToIdle_IT(DWIN_uart, (uint8_t*) ucDWINBuf,
+				DWIN_SER_PDU_SIZE_MAX);
+
+			if (status != HAL_BUSY) {
+				xDWINPortEventPost(DWIN_EV_READY);
+			}
 
 			break;
 
@@ -354,38 +400,25 @@ eDWINErrorCode eDWINPoll( void ) {
 						DWIN_ADDR_START_DATA_POS,
 						ucDWINBuf[DWIN_ADDR_START_DATA_LEN] * 2);
 				pr_dscr.state = STATE_READ_COMMAND;
-			} else {
+			} else if (ucFunctionCode == FUNC_CODE_READ) {
 				eDWINFuncWriteRegister((UCHAR*) ucDWINBuf, ucRegistersBuf,
 						&usLength);
 			}
 
-			usLength = 0;
-			ucDWINFrame_TX[usLength++] = 0x5A;
-			ucDWINFrame_TX[usLength++] = 0xA5;
-			ucDWINFrame_TX[usLength++] = 0x03;
-			ucDWINFrame_TX[usLength++] = 0x83;
-			ucDWINFrame_TX[usLength++] = 0x4F;
-			ucDWINFrame_TX[usLength++] = 0x4B;
-			//}
-			/* If the request was not sent to the broadcast address we
-			 * return a reply. */
-			if (ucDWINAddress != DWIN_ADDRESS_BROADCAST) {
-				if (eException != DWIN_EX_NONE) {
-					eStatus = peDWINFrameSendCur(ucDWINAddress,
-							(UCHAR*) ucDWINFrame_TX, usLength);
-					if (eStatus == DWIN_TX_BUSY) {
-						xDWINPortEventPost(DWIN_EV_FRAME_SENT);
-					}
-				}
-			}
+			xDWINPortEventPost(DWIN_EV_READY);
 
 			break;
 
+		case DWIN_EV_REQUEST_SENT:
+			peHMISendRequestCur(tmpSlaveAddress, tmpPucFrame, tmpUsLength);
+			break;
+
+			/* Don't use */
 		case DWIN_EV_FRAME_SENT:
 
 			HAL_UARTEx_ReceiveToIdle_IT(DWIN_uart, (uint8_t*) ucDWINBuf,
 			DWIN_SER_PDU_SIZE_MAX);
-			(void) xDWINPortEventPost(DWIN_EV_READY);
+			xDWINPortEventPost(DWIN_EV_READY);
 			break;
 		}
 	}
