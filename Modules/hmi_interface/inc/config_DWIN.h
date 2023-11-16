@@ -3,11 +3,15 @@
 
 #include <stm32f405xx.h>
 
+#define PLC_RATE									72000000
+
 #define DAC_ENABLE									( 1 )
 
 #define DMA_ENABLE									( 1 )
 
-#define DATA_USART2_TX								( 0 )
+#define SEND_CURV_TEST								( 0 )
+
+#define CURV_ENABLE									( 1 )
 
 #define MODBUS_ENABLE								( 0 ) 
 
@@ -20,6 +24,8 @@
 #define PEREPH_ENABLE								( 1 )
 
 #define HAL_ADC_MODULE_ENABLED						( 1 )
+
+#define VACUUM_SENSOR_ENABLE						( 1 )
 
 #define BLDC_ENGINE_ENABLE							( 1 )
 

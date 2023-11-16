@@ -7,6 +7,15 @@
 #include "bldc_motors.h"
 
 /*
+* 	@bref: init BLDC engine struct
+*	@param (bldc) - struct BLDC motor
+*	@param (dac) - used DAC for make output signal
+*/
+void init_BLDC(t_bldc_engine* bldc, t_dac* dac) {
+	bldc->dac = dac;
+}
+
+/*
 * @bref: start BLDC engine in set value
 *	@param (bldc) - struct BLDC motor
 *	@param (power) - value of power

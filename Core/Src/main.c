@@ -59,6 +59,7 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim3;
 TIM_HandleTypeDef htim4;
 TIM_HandleTypeDef htim5;
+TIM_HandleTypeDef htim7;
 TIM_HandleTypeDef htim10;
 DMA_HandleTypeDef hdma_tim3_ch4_up;
 DMA_HandleTypeDef hdma_tim4_up;
@@ -76,6 +77,7 @@ extern t_step_engine step_engines[2];
 
 
 t_vac_sen vac_sensor;
+t_vac_pump vac_pump;
 t_dac dac;
 t_bldc_engine bldc_engine;
 
@@ -115,12 +117,58 @@ static void MX_TIM4_Init(void);
 static void MX_TIM5_Init(void);
 static void MX_TIM10_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_TIM7_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+uint8_t cnt = 0;
+
+#if SEND_CURV_TEST
+void DataWrite(uint16_t data, uint8_t curve) {
+	uint8_t low_byte = data;
+	data = data >> 8;
+	uint8_t high_byte = data;
+
+	uint8_t mdata[14] = { 0x00 };
+	mdata[0] = 0x5A;
+	mdata[1] = 0xA5;
+	mdata[2] = 0x0B;
+	mdata[3] = 0x82;
+	mdata[4] = 0x03;
+	mdata[5] = 0x10;
+	mdata[6] = 0x5A;
+	mdata[7] = 0xA5;
+	mdata[8] = 0x01;
+	mdata[9] = 0x00;
+	mdata[10] = curve;
+	mdata[11] = 0x01;
+	mdata[12] = high_byte;
+	mdata[13] = low_byte;
+
+	HAL_UART_Transmit(&huart1, mdata, 14, 300);
+
+}
+#endif
+
+void init_Test_Time(void) {
+	/* Проверка работы на осциллографе */
+
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN; //Enable GPIOA
+
+	/* PA7 - шип 1 */
+	GPIOA->MODER &= ~GPIO_MODER_MODE7;
+	GPIOA->MODER |= GPIO_MODER_MODE7_0; //Output mode
+	GPIOA->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR7_1;
+
+	/*
+	 * GPIOA->BSRR |= GPIO_BSRR_BR7; reset
+	 * GPIOA->BSRR |= GPIO_BSRR_BS7; set
+	 * */
+
+}
 
 /* USER CODE END 0 */
 
@@ -153,6 +201,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
+  MX_ADC1_Init();
   MX_TIM1_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
@@ -160,10 +209,13 @@ int main(void)
   MX_TIM5_Init();
   MX_TIM10_Init();
   MX_USART1_UART_Init();
+  MX_TIM7_Init();
   /* USER CODE BEGIN 2 */
   #if HAL_ADC_MODULE_ENABLED
   MX_ADC1_Init();
   #endif
+
+  init_Test_Time();
 	
 	#if MODBUS_ENABLE
 	
@@ -192,6 +244,9 @@ int main(void)
 	
 	ctrl.dev = &dev;
 	ctrl.programms = &pr_dscr;
+
+	ctrl.HMI_curves[0].refresh_rate = 2;
+	ctrl.HMI_curves[0].tim = &htim7;
 	
 	init_HMI(&ctrl);
 	#endif
@@ -205,47 +260,37 @@ int main(void)
 	dev.step_engine = step_engines;
 
 	/* Initial X-axes step engine */
-	step_engines[0].mode = STOP;
-	step_engines[0].vel = SPEED_MIN;
-	step_engines[0].accel_size = 0;
-	step_engines[0].dir = 1;
 	
-	step_engines[0].engine_TIM_master = &htim3;
-	step_engines[0].engine_TIM_slave = &htim2;
-	
-	init_step_engine(&step_engines[0]);
+	init_step_engine(&step_engines[0], &htim3, &htim2);
 	
 	/* Initial Y-axes step engine */
-	step_engines[1].mode = STOP;
-	step_engines[1].vel = SPEED_MIN;
-	step_engines[1].accel_size = 0;
-	step_engines[1].dir = 1;
-	step_engines[1].engine_TIM_master = &htim4;
-	step_engines[1].engine_TIM_slave = &htim5;
 	
-	init_step_engine(&step_engines[1]);
+	init_step_engine(&step_engines[1], &htim4, &htim5);
+
 	#endif
 
 	#if HAL_ADC_MODULE_ENABLED
-	vac_sensor.setpoint = 0;
-	vac_sensor.adc = &hadc1;
-	dev.vac_sensor = &vac_sensor;
+		#if VACUUM_SENSOR_ENABLE
+			init_vac_sens(&vac_sensor, &hadc1);
+			dev.vac_sensor = &vac_sensor;
+			init_vac_pump(&vac_pump, 100, 0x0);
+			dev.vac_pump = &vac_pump;
+		#endif
 	#endif
 
 	#if BLDC_ENGINE_ENABLE
 	bldc_engine.power = 0;
 	dev.bldc_engine = &bldc_engine;
-	bldc_engine.dac = &dac;
+	init_BLDC(dev.bldc_engine, &dac);
 	#endif
 	
 	#if DAC_ENABLE
 	/* DAC init */
-	dac.tim = TIM6;
-	dac.dac_type = DAC;
-	dac.tim_presc = 719;
-	dac.tim_arr = 7;
-	CMSIS_DAC_init(&dac);
-	uint16_t a;
+	dev.bldc_engine->dac->tim = TIM6;
+	dev.bldc_engine->dac->dac_type = DAC;
+	dev.bldc_engine->dac->tim_presc = 719;
+	dev.bldc_engine->dac->tim_arr = 7;
+	CMSIS_DAC_init(dev.bldc_engine->dac);
 	#endif
 
 	#if DWIN_SERIAL_PORT_ENABLE
@@ -274,18 +319,18 @@ int main(void)
 		ctrl.queue = ring_buf;
 	}
 
-	/* USER CODE END 2 */
+  /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
 		#if PEREPH_ENABLE
-			#if DATA_USART2_TX
+			#if SEND_CURV_TEST
 			cnt++;
 			if (cnt >= 255) cnt = 0;
-			DataWrite(cnt);
-			HAL_Delay(10);
+			DataWrite(cnt, 0x0);
+			HAL_Delay(100);
 			#endif		
 		
 			#if DAC_ENABLE
@@ -340,7 +385,12 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLM = 8;
+  RCC_OscInitStruct.PLL.PLLN = 72;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -349,12 +399,12 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_2) != HAL_OK)
   {
     Error_Handler();
   }
@@ -711,6 +761,44 @@ static void MX_TIM5_Init(void)
 }
 
 /**
+  * @brief TIM7 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM7_Init(void)
+{
+
+  /* USER CODE BEGIN TIM7_Init 0 */
+
+  /* USER CODE END TIM7_Init 0 */
+
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM7_Init 1 */
+
+  /* USER CODE END TIM7_Init 1 */
+  htim7.Instance = TIM7;
+  htim7.Init.Prescaler = 7219;
+  htim7.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim7.Init.Period = 999;
+  htim7.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim7) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim7, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM7_Init 2 */
+
+  /* USER CODE END TIM7_Init 2 */
+
+}
+
+/**
   * @brief TIM10 Initialization Function
   * @param None
   * @retval None
@@ -850,18 +938,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
-
-	int value;
-
-	if (hadc->Instance == ADC1) {
-		//ctrl.dev->vac_sensor->cur_pres = get_value(ctrl.dev->vac_sensor->adc);
-		ctrl.dev->vac_sensor->cur_pres = HAL_ADC_GetValue(hadc);
-		//value = HAL_ADC_GetValue(hadc);
-		//dac.dac_type->DHR12R1 = value;
-		dac.dac_type->DHR12R1 = ctrl.dev->vac_sensor->cur_pres;
-	}
-}
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {

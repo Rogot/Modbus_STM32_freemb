@@ -7,7 +7,7 @@
 */
 void clear(uint8_t* arr, uint8_t size) {
 	for (uint8_t i = 0; i < size; i++) {
-		arr[i] = ' ';
+		arr[i] = 0;
 	}
 }
 

@@ -9,6 +9,7 @@
 #include "DWIN_port.h"
 #include "config_DWIN.h"
 #include "DWIN_addr_conv.h"
+#include "utils.h"
 
 /* ----------------------- Defines ------------------------------------------*/
 #define DWIN_HMI_PACKET_DATA_SIZE			248

@@ -8,12 +8,31 @@
 #include "vacum_sens.h"
 
 /*
-* @bref: set setpoint
-* @param (vSen) - vacuum sensor struct
-* @param (value) - setpoint value
+* 	@bref: init vacuum sensor struct
+*	@param (vSen) - struct vacuum sensor
+*	@param (adc) - used ADC for recieve input signal
+*	@param (setpoint) - start setpoint
 */
-void set_setpoint(t_vac_sen* vSen, uint16_t value) {
-	vSen->setpoint = value;
+void init_vac_sens(t_vac_sen* vSen, ADC_HandleTypeDef* adc) {
+	vSen->adc = adc;
+
+	#if 1
+		/*TEST*/
+		/* PB7 */
+
+		RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;	/* Enable alternative functions */
+		RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN; 	/* Enable GPIOB */
+
+		GPIOB->MODER &= ~GPIO_MODER_MODE7; /* Input mode */
+		GPIOB->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR7_1; /* High speed */
+		//GPIOB->PUPDR |= GPIO_PUPDR_PUPD7_1;
+
+		SYSCFG->EXTICR[1] |= SYSCFG_EXTICR2_EXTI7_PB;
+		EXTI->PR = EXTI_PR_PR7;
+		EXTI->IMR |= EXTI_IMR_MR7; /* Enable interrupts from EXTI7 */
+		EXTI->RTSR |= EXTI_RTSR_TR7; /* Rising Trigger enable */
+		NVIC_EnableIRQ(EXTI9_5_IRQn); /* Handler for EXTI 5...9 interrupt */
+	#endif
 }
 
 /*
@@ -23,22 +42,4 @@ void set_setpoint(t_vac_sen* vSen, uint16_t value) {
 */
 uint16_t get_value( ADC_HandleTypeDef* hadc ) {
 	return HAL_ADC_GetValue(hadc);
-}
-
-
-/*
-* @bref: checking whether the setpoint level has been reached
-* @param (vSen) - vacuum sensor struct
-* @res - result of checking
-*/
-eVacSetPoint is_setpoint(t_vac_sen* vSen) {
-
-	if (vSen->cur_pres == vSen->setpoint) {
-		return VAC_SETPOINT_REACHED;
-	} else if (vSen->cur_pres > vSen->setpoint) {
-		return VAC_SETPOINT_LOWER;
-	} else if (vSen->cur_pres < vSen->setpoint) {
-		return VAC_SETPOINT_UPPER;
-	}
-
 }

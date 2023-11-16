@@ -22,6 +22,7 @@ typedef enum
 	STATE_EXECUTE_COMMAND = 2, 				/*!< Execute command */
 	STATE_BUSY_COMMAND = 3, 				/*!< Busy */
 	STATE_SAND_REQUEST = 4, 				/*!< Send request to other device */
+	STATE_END_PROGRAMM = 5, 				/*!< End of program */
 } eProcState;
 
 typedef struct COMMAND_DISCR 
@@ -46,7 +47,7 @@ typedef struct PROGRAM_DISCCR
 } prog_dscrptr;
 
 void proc_funct_init(prog_dscrptr* pd);
-void proccesing_HMI_request(prog_dscrptr* pd);
+eProcState proccesing_HMI_request(prog_dscrptr* pd);
 uint8_t copy_to(const uint8_t* src, uint8_t* dst, uint8_t start_data_pos, uint8_t usLen);
 eProcState parser(const uint8_t* program, command_dscrptr* com_dscr, uint8_t* start_pos, uint8_t usLen);
 

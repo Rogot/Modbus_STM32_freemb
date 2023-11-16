@@ -14,8 +14,7 @@
 #include "ring_buf.h"
 
 void ringBuf_put(t_queue_dicr disc, t_ring_buf* buf) {
-    buf->que_disc[buf->idxIn].state = disc.state;
-    buf->que_disc[(buf->idxIn)++].reg_num = disc.reg_num;
+    buf->que_disc[buf->idxIn++] = disc;
     if (buf->idxIn >= buf->size) {
         buf->idxIn = 0;
     }

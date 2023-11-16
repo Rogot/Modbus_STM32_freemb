@@ -9,7 +9,7 @@ void proc_funct_init(prog_dscrptr* pd) {
 * @bref: proccesing program grom HMI
 *	@param (pd) - programm descriptor
 */
-void proccesing_HMI_request(prog_dscrptr* pd) {
+eProcState proccesing_HMI_request(prog_dscrptr* pd) {
 
 	pd->state = parser(pd->usDataRx, &pd->com_dscr, &pd->read_cnt, pd->size);
 
@@ -32,7 +32,11 @@ void proccesing_HMI_request(prog_dscrptr* pd) {
 			pd->par2 = atoi(pd->com_dscr.p2);
 		} else if (strcmp(pd->com_dscr.name, "MIX") == 0) {
 			pd->par1 = atoi(pd->com_dscr.p1);
+		} else if (strcmp(pd->com_dscr.name, "VS") == 0) {
+			pd->par1 = atoi(pd->com_dscr.p1);
 		}
+	} else {
+		return STATE_END_PROGRAMM;
 	}
 }
 

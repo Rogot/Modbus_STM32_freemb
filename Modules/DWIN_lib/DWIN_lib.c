@@ -335,7 +335,6 @@ void eDWINRequestSend( UCHAR slaveAddress, const UCHAR * pucFrame, USHORT usLeng
 /*
 * @bref: main loop for control protocol request
 */
-int a;
 eDWINErrorCode eDWINPoll( void ) {
 	static UCHAR*	 ucDWINFrame;
 	static UCHAR	 ucDWINFrame_TX[50];
@@ -399,6 +398,7 @@ eDWINErrorCode eDWINPoll( void ) {
 				pr_dscr.size = copy_to((UCHAR*) ucDWINBuf, pr_dscr.usDataRx,
 						DWIN_ADDR_START_DATA_POS,
 						ucDWINBuf[DWIN_ADDR_START_DATA_LEN] * 2);
+				clear(ucDWINBuf, ucDWINBuf[DWIN_ADDR_START_DATA_LEN] * 2);
 				pr_dscr.state = STATE_READ_COMMAND;
 			} else if (ucFunctionCode == FUNC_CODE_READ) {
 				eDWINFuncWriteRegister((UCHAR*) ucDWINBuf, ucRegistersBuf,

@@ -33,6 +33,8 @@
 #define RUN 									3
 #define SLOWDOWN 								4
 
+#define ENGINE_NUM								2
+
 /* DEFINE END */
 
 typedef struct STEP_ENGINE {
@@ -56,7 +58,9 @@ typedef struct STEP_ENGINE {
 	TIM_HandleTypeDef* engine_TIM_slave; //TIM2
 } t_step_engine;
 
-void init_step_engine(t_step_engine* step_eng);
+void init_step_engine(t_step_engine* step_eng,
+						TIM_HandleTypeDef* engine_TIM_master,
+						TIM_HandleTypeDef* engine_TIM_slave);
 void led_init(); /* LED-pin init */
 
 void move_step_engine(t_step_engine* step_eng, int16_t pos, float vel);

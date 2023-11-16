@@ -1,7 +1,7 @@
 #include "step_engine.h"
 #include "hmi_interface.h"
 /* VARIABLES BEGIN */
-t_step_engine step_engines[2];
+t_step_engine step_engines[ENGINE_NUM];
 extern t_control ctrl;
 extern uint16_t reqiest_data;
 uint8_t start=0;
@@ -16,10 +16,23 @@ extern uint8_t is_start_pos;
 
 /*
 * @bref: initial parameters of step engine
-* @param step_eng - pointer to the step engine which will be controlled
+* @param (step_eng) - pointer to the step engine which will be controlled
+* @param (engine_TIM_master) - pointer to the Master Timer
+* @param (engine_TIM_slave) - pointer to the Slave Timer
 */
 
-void init_step_engine(t_step_engine* step_eng) {
+void init_step_engine(t_step_engine* step_eng,
+						TIM_HandleTypeDef* engine_TIM_master,
+						TIM_HandleTypeDef* engine_TIM_slave) {
+
+	(*step_eng).mode = STOP;
+	(*step_eng).vel = SPEED_MIN;
+	(*step_eng).accel_size = 0;
+	(*step_eng).dir = 1;
+
+	(*step_eng).engine_TIM_master = engine_TIM_master;
+	(*step_eng).engine_TIM_slave = engine_TIM_slave;
+
 	(*step_eng).engine_TIM_slave->Instance->CNT = START_POS_VALUE;
 	(*step_eng).engine_TIM_slave->Instance->CCR1 = START_POS_VALUE;
 	HAL_TIM_OC_Start_IT((*step_eng).engine_TIM_slave, TIM_CHANNEL_1);
@@ -161,20 +174,20 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 			t_step_engine* step_eng = NULL;
 			if (htim->Instance == TIM2) {
 				step_eng = &step_engines[0];
-				if ((*step_eng).mode == SLOWDOWN) {
-					t_queue_dicr disc;
-
-					disc.state = STEP_ENGINE_1_STOPPED;
-					ringBuf_put(disc, ctrl.queue->que_disc);
-				}
+//				if ((*step_eng).mode == SLOWDOWN) {
+//					t_queue_dicr disc;
+//
+//					disc.state = STEP_ENGINE_1_STOPPED;
+//					ringBuf_put(disc, ctrl.queue);
+//				}
 			} else if (htim->Instance == TIM5) {
 				step_eng = &step_engines[1];
-				if ((*step_eng).mode == SLOWDOWN) {
-					t_queue_dicr disc;
-
-					disc.state = STEP_ENGINE_2_STOPPED;
-					ringBuf_put(disc, ctrl.queue->que_disc);
-				}
+//				if ((*step_eng).mode == SLOWDOWN) {
+//					t_queue_dicr disc;
+//
+//					disc.state = STEP_ENGINE_2_STOPPED;
+//					ringBuf_put(disc, ctrl.queue);
+//				}
 			}
 		
     	if((*step_eng).mode == SPEEDUP){
@@ -229,7 +242,7 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
     			ctrl.programms->state = STATE_SAND_REQUEST;
 
     			disc.state = HOME_IS_REACHED;
-    			ringBuf_put(disc, ctrl.queue->que_disc);
+    			ringBuf_put(disc, ctrl.queue);
     		}
 
     		HAL_TIM_OC_Stop((*step_eng).engine_TIM_master, TIM_CHANNEL_3);

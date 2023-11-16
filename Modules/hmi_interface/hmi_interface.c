@@ -12,6 +12,36 @@ static uint8_t usLenth = 0;
 uint16_t reqiest_data[10];
 peHMISendRequest peHMISendRequestCur;
 
+
+/*
+* @bref: inital function for HMI
+* @param (contrl) - all parameters for controlling by HMI
+*/
+void init_HMI(t_control* contrl) {
+
+
+
+	for (uint8_t i = 0; i < CURV_MAX_NUM; i++) {
+		if (contrl->HMI_curves[i].tim != NULL) {
+			contrl->HMI_curves[i].tim->Instance->CR1 &= ~TIM_CR1_CEN;
+
+			contrl->HMI_curves[i].tim->Instance->ARR = PLC_RATE /
+						(contrl->HMI_curves[i].tim->Instance->PSC * contrl->HMI_curves[i].refresh_rate);
+
+//			contrl->HMI_curves[i].tim->Instance->ARR = 60000;
+			contrl->HMI_curves[i].tim->Instance->CR1 |= TIM_CR1_CEN;
+
+			HAL_TIM_Base_Start_IT(contrl->HMI_curves[i].tim);
+
+			contrl->HMI_curves[i].state = CURV_IDLE;
+		}
+	}
+
+	contrl->exe_prog = 0x01;
+
+	read_program(current_program, 0);
+}
+
 /*
 * @bref: send a request to other device
 * @param (ucSlaveAddress) - slave address
@@ -156,22 +186,26 @@ void move_SE(t_control* contrl, uint8_t num) {
 void move_SE_to(t_control* contrl, uint8_t num) {
 #if !STEP_ENGINE_TEST_ENABLE
 
-	if (contrl->is_manual == 0x00 && contrl->is_launch == 0x01
+	if (contrl->is_manual == 0x00 && contrl->is_launch >= 0x01
 			&& contrl->dev->step_engine->mode == STOP) {
 		contrl->programms->state = STATE_BUSY_COMMAND;
 		if (contrl->programms->par2 > MAX_VEL_PROG) {
 			contrl->programms->par2 = MAX_VEL_PROG;
-		}
+		} else if (contrl->programms->par2 > 0x0) {
 
-		uint32_t start_pos = START_POS_VALUE + calc_steps(contrl->programms->par1) * RATIO_GEARBOX;
-		uint32_t cur_pos = contrl->dev->step_engine[num].
-						engine_TIM_slave->Instance->CCR1;
+			uint32_t start_pos = START_POS_VALUE + calc_steps(contrl->programms->par1) * RATIO_GEARBOX;
+			uint32_t cur_pos = contrl->dev->step_engine[num].
+							engine_TIM_slave->Instance->CCR1;
 
-		int32_t res = (int16_t)start_pos - (int16_t )cur_pos;
-		if (res > 1 || res < -1) {
-			move_step_engine(&contrl->dev->step_engine[num], (int16_t )(res), (float)(
-								(float)contrl->programms->par2 * RATIO_GEARBOX / BASE_FREQ
-								/ ANFLE_ONE_STEP * 2));
+			int32_t res = (int16_t)start_pos - (int16_t )cur_pos;
+
+			if (res > 1 || res < -1) {
+				move_step_engine(&contrl->dev->step_engine[num], (int16_t )(res), (float)(
+									(float)contrl->programms->par2 * RATIO_GEARBOX / BASE_FREQ
+									/ ANFLE_ONE_STEP * 2));
+			} else {
+				contrl->programms->state = STATE_READ_COMMAND;
+			}
 		} else {
 			contrl->programms->state = STATE_READ_COMMAND;
 		}
@@ -184,7 +218,7 @@ void move_SE_to(t_control* contrl, uint8_t num) {
 *	@param (contrl) - all parameters for controlling by HMI
 */
 void control_BLCD(t_control* contrl) {
-	if (contrl->is_manual == 0x00 && contrl->is_launch == 0x01) {
+	if (contrl->is_manual == 0x00 && contrl->is_launch >= 0x01) {
 
 		contrl->dev->bldc_engine->power = contrl->programms->par1;
 
@@ -277,32 +311,48 @@ void move_start_pos(t_control* contrl, uint8_t num) {
 */
 void eHMIPoll(t_control* contrl, int* usRegBuf) {
 
+	static eProcState pState;
+
 	t_queue_dicr discr;
 
 	refresh_reg(contrl, usRegBuf);
 	
-#if HAL_ADC_MODULE_ENABLED
+#if HAL_ADC_MODULE_ENABLED && VACUUM_SENSOR_ENABLE
 	contrl->dev->vac_sensor->cur_pres = get_value(contrl->dev->vac_sensor->adc);
 
-	switch (is_setpoint(contrl->dev->vac_sensor)) {
+	switch (is_setpoint(contrl->dev->vac_pump, contrl->dev->vac_sensor)) {
 	case VAC_SETPOINT_REACHED:
+
+		//TO DO: make upperBoard and lower measurement boundary
+
 		break;
 	case VAC_SETPOINT_LOWER:
+
+		//TO DO: pump ON
+
 		break;
 	case VAC_SETPOINT_UPPER:
+
+		//TO DO: pump ON
+
 		break;
 	}
 #endif
 
 	switch (contrl->programms->state) {
 	case STATE_IDLE_COMMAND:
-		contrl->is_launch = 0x00;
-		usRegBuf[LAUNCH_PROGRAM] = 0x0;
 		contrl->programms->read_cnt = 0;
 		break;
 
 	case STATE_READ_COMMAND:
-		proccesing_HMI_request(contrl->programms);
+
+		pState = proccesing_HMI_request(contrl->programms);
+
+		if (pState == STATE_END_PROGRAMM) {
+			contrl->programms->state = STATE_SAND_REQUEST;
+			discr.state = END_PROGRAMM;
+			ringBuf_put(discr, contrl->queue);
+		}
 		break;
 
 	case STATE_EXECUTE_COMMAND:
@@ -311,16 +361,20 @@ void eHMIPoll(t_control* contrl, int* usRegBuf) {
 			move_SE_to(contrl, 0);
 		#endif
 		}
-		if (strcmp(contrl->programms->com_dscr.name, "AX2") == 0) {
+		else if (strcmp(contrl->programms->com_dscr.name, "AX2") == 0) {
 		#if STEP_ENGINE_ENABLE
 			move_SE_to(contrl, 1);
 		#endif
 		}
-		if (strcmp(contrl->programms->com_dscr.name, "MIX") == 0) {
+		else if (strcmp(contrl->programms->com_dscr.name, "MIX") == 0) {
 		#if BLDC_ENGINE_ENABLE
 			control_BLCD(contrl);
 		#endif
 		}
+		else if (strcmp(contrl->programms->com_dscr.name, "VS") == 0) {
+			//pump_ON(&contrl->is_pump_ON);
+		}
+
 		break;
 
 	case STATE_SAND_REQUEST:
@@ -337,7 +391,11 @@ void eHMIPoll(t_control* contrl, int* usRegBuf) {
 				usRegBuf[STEP_ENGINE_START_POS_MS] = 0x0;
 				discr.reg_num = STEP_ENGINE_START_POS_MS;
 				break;
-
+			case END_PROGRAMM:
+				contrl->is_launch = 0x0;
+				usRegBuf[LAUNCH_PROGRAM] = 0x0;
+				discr.reg_num = LAUNCH_PROGRAM;
+				break;
 			}
 		}
 
@@ -359,22 +417,6 @@ void eHMIPoll(t_control* contrl, int* usRegBuf) {
 		break;
 	}
 
-/*	if ((usRegBuf[STEP_ENGINE_START_POS_MS] & 0xFF) == 0x01) {
-
-		usRegBuf[STEP_ENGINE_START_POS_MS] = 0x0;
-
-		reqiest_data[usLenth++] = STEP_ENGINE_START_POS_MS;
-		usLenth++;
-		reqiest_data[usLenth++] = usRegBuf[STEP_ENGINE_START_POS_MS] >> 8;
-		reqiest_data[usLenth++] = usRegBuf[STEP_ENGINE_START_POS_MS] & 0xFF;
-
-
-		send_request(0xA5, (uint8_t*)reqiest_data, 0x82, usLenth);
-		usLenth = 0x0;
-		usRegBuf[STEP_ENGINE_START_POS_MS] = 0x00;
-	}
-*/
-
 	#if STEP_ENGINE_ENABLE
 	if( contrl->is_manual == 0x01 && contrl->is_launch == 0x00
 				&& contrl->dev->step_engine->mode == STOP){
@@ -394,7 +436,13 @@ void eHMIPoll(t_control* contrl, int* usRegBuf) {
 		}
 	}
 	#endif
-			
+
+	/* Sending current vacuum value */
+	if (contrl->HMI_curves[0].state == CURV_SEND_DATA) {
+		contrl->HMI_curves[0].state = CURV_IDLE;
+		send_data_curve(0xA5, ctrl.dev->vac_sensor->cur_pres, 0x00);
+	}
+
 	#if FLASH_ENABLE
 	if (contrl->save_prog != 0) {
 		usRegBuf[SAVE_PROGRAM] = 0x0;
@@ -424,21 +472,6 @@ void refresh_reg(t_control* contrl, int* usRegBuf) {
 	contrl->dev->step_engine->manual_move_right = (uint8_t)usRegBuf[STEP_ENGINE_MOVE_RIGHT];
 }
 
-
-
-/*
-* @bref: inital function for HMI
-* @param (contrl) - all parameters for controlling by HMI
-*/
-void init_HMI(t_control* contrl) {
-
-
-	contrl->exe_prog = 0x01;
-	
-	read_program(current_program, 0);
-}
-
-
 /*
 * @bref: search start position - "0" via end cap
 * @param (contrl) - all parameters for controlling by HMI
@@ -461,7 +494,71 @@ void search_home(t_control* contrl) {
 	
 }
 
+/*
+* @bref: checking whether the setpoint level has been reached
+* @param (vPump) - vacuum pump struct
+* @param (vSen) - vacuum sensor struct
+* @res - result of checking
+*/
+eVacSetPoint is_setpoint(t_vac_pump* vPump, t_vac_sen* vSen) {
 
+	if (vSen->cur_pres == vPump->setpoint) {
+		return VAC_SETPOINT_REACHED;
+	} else if (vSen->cur_pres > vPump->setpoint) {
+		return VAC_SETPOINT_LOWER;
+	} else if (vSen->cur_pres < vPump->setpoint) {
+		return VAC_SETPOINT_UPPER;
+	}
+
+}
+
+
+/* ON/OFF Vacuum pump */
+void pump_ON( t_vac_pump* v_pump ) {
+
+}
+void pump_OFF( t_vac_pump* v_pump ) {
+
+}
+
+extern UART_HandleTypeDef huart1;
+
+void send_data_curve(uint8_t ucSlaveAddress, uint16_t data, uint8_t curve) {
+	static uint8_t mdata[14] = { 0x00 };
+
+	uint8_t 	usLength = 0;
+	uint8_t 	low_byte = data;
+	data = data >> 8;
+	uint8_t 	high_byte = data;
+
+	mdata[usLength++] = 0x5A;
+	mdata[usLength++] = ucSlaveAddress;
+	mdata[usLength++] = 0x0B;
+	mdata[usLength++] = 0x82;
+	mdata[usLength++] = 0x03;
+	mdata[usLength++] = 0x10;
+	mdata[usLength++] = 0x5A;
+	mdata[usLength++] = 0xA5;
+	mdata[usLength++] = 0x01;
+	mdata[usLength++] = 0x00;
+	mdata[usLength++] = curve;
+	mdata[usLength++] = 0x01;
+	mdata[usLength++] = high_byte;
+	mdata[usLength++] = low_byte;
+
+	peHMISendRequestCur(ucSlaveAddress, mdata, usLength);
+}
+
+/****** IRQ Handlers ******/
+
+/**
+  * @brief This function handles TIM1 trigger and commutation interrupts and TIM11 global interrupt.
+  */
+void TIM7_IRQHandler(void)
+{
+	ctrl.HMI_curves[0].state = CURV_SEND_DATA;
+	HAL_TIM_IRQHandler(ctrl.HMI_curves[0].tim);
+}
 
 /**
   * @brief This function handles TIM6 global interrupt.
@@ -470,4 +567,24 @@ void TIM6_DAC_IRQHandler(void)
 {
 	ctrl.dev->bldc_engine->dac->tim->SR &= ~TIM_SR_UIF;
 	ctrl.dev->bldc_engine->dac->dac_type->DHR12R1 = ctrl.dev->bldc_engine->power;
+}
+
+
+void EXTI9_5_IRQHandler(void){
+	//pump_OFF(&ctrl.is_pump_ON);
+	EXTI->PR |= EXTI_PR_PR7;
+}
+
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
+
+	int value;
+
+	if (hadc->Instance == ADC1) {
+		ctrl.dev->vac_sensor->cur_pres = HAL_ADC_GetValue(hadc);
+		//value = HAL_ADC_GetValue(hadc);
+		//dac.dac_type->DHR12R1 = value;
+		//ctrl.dev->bldc_engine->power = ctrl.dev->vac_sensor->cur_pres;
+
+		//dac.dac_type->DHR12R1 = ctrl.dev->vac_sensor->cur_pres;
+	}
 }

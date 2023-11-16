@@ -16,6 +16,7 @@ t_dac* dac; 					/* ptr for using DAC */
 uint16_t power;
 }t_bldc_engine;
 
+void init_BLDC(t_bldc_engine* bldc, t_dac* dac);
 void start_BLDC(t_bldc_engine* bldc, uint16_t power);
 void stop_BLDC(t_bldc_engine* bldc);
 
