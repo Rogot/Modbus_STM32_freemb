@@ -49,6 +49,7 @@ typedef struct STEP_ENGINE {
 	uint32_t speedupCNT;
 	uint32_t runCNT;
 	uint32_t slowdownCNT;
+	uint32_t pres_CNT;
 	int16_t cnt;
 	uint8_t manual_mode;
 	uint8_t start_pose_mode;
@@ -64,6 +65,10 @@ void init_step_engine(t_step_engine* step_eng,
 void led_init(); /* LED-pin init */
 
 void move_step_engine(t_step_engine* step_eng, int16_t pos, float vel);
+
+void speed_up_step(t_step_engine* step_eng);
+void run_step(t_step_engine* step_eng);
+void speed_down_step(t_step_engine* step_eng);
 
 int16_t calc_steps(int16_t pos);
 

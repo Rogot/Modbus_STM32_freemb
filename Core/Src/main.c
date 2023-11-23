@@ -256,16 +256,27 @@ int main(void)
   //HAL_DBGMCU_EnableDBGStopMode();
 	//DBGMCU->APB1FZ |= DBGMCU_APB1_FZ_DBG_TIM3_STOP;
 	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_SET);
-	
+	t_LSPort port;
 	dev.step_engine = step_engines;
+
 
 	/* Initial X-axes step engine */
 	
 	init_step_engine(&step_engines[0], &htim3, &htim2);
-	
+
+	port.port_letter = 'B';
+	port.port_number = 7;
+
+	limit_siwitch_init(&port, 0);
 	/* Initial Y-axes step engine */
 	
 	init_step_engine(&step_engines[1], &htim4, &htim5);
+
+	port.port_letter = 'B';
+	port.port_number = 9;
+
+	limit_siwitch_init(&port, 1);
+	/* Limited switch init */
 
 	#endif
 

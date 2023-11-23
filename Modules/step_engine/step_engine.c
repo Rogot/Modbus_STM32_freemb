@@ -145,14 +145,15 @@ void move_step_engine(t_step_engine* step_eng, int16_t pos, float vel) {
 	 
 	 if ((*step_eng).speedupCNT == 0x0) {
 		 (*step_eng).engine_TIM_master->Instance->ARR = 1 / (*step_eng).vel;
-		 (*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT 
-																						+ (*step_eng).dir * (*step_eng).runCNT;
+//		 (*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT
+//																						+ (*step_eng).dir * (*step_eng).runCNT;
+
 		 (*step_eng).mode = RUN;
-		 HAL_TIM_OC_Start((*step_eng).engine_TIM_master, TIM_CHANNEL_3);
 	 } else {
 		 
-		 (*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT
-													+ (*step_eng).dir * (*step_eng).speedupCNT;
+//		 (*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT
+//													+ (*step_eng).dir * (*step_eng).speedupCNT;
+
 		 
 		 HAL_DMA_Start_IT((*step_eng).engine_TIM_master->hdma[TIM_DMA_ID_UPDATE], 
 						(uint32_t)(*step_eng).speedupbuf, 
@@ -162,9 +163,10 @@ void move_step_engine(t_step_engine* step_eng, int16_t pos, float vel) {
 		 __HAL_TIM_ENABLE_DMA((*step_eng).engine_TIM_master, TIM_DMA_UPDATE);
 			
 		 (*step_eng).mode=SPEEDUP;
-		 
-		 HAL_TIM_OC_Start((*step_eng).engine_TIM_master, TIM_CHANNEL_3);
 	 }
+	 (*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT
+	 													+ (*step_eng).dir * (*step_eng).speedupCNT;
+	 HAL_TIM_OC_Start((*step_eng).engine_TIM_master, TIM_CHANNEL_3);
 }
 
 void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
@@ -191,64 +193,94 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 			}
 		
     	if((*step_eng).mode == SPEEDUP){
-    		if (!(*step_eng).manual_mode || (*step_eng).start_pose_mode) {
-				(*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT
-																						+ (*step_eng).dir * (*step_eng).runCNT;
-				(*step_eng).mode = RUN;
-			} else if (is_start_pos) {
-				(*step_eng).engine_TIM_slave->Instance->CCR1 = 2147483647;
-				(*step_eng).mode = RUN;
-			}	else {
-				(*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT
-													+ (*step_eng).dir * 10;
-					
-				if (!(*step_eng).manual_move_left && !(*step_eng).manual_move_right) {
-					(*step_eng).mode = RUN;
-				}
-			}
-    		(*step_eng).engine_TIM_master->Instance->ARR = (uint16_t) 1 / (*step_eng).vel;
+    		speed_up_step(step_eng);
     	}
     	else
     	if((*step_eng).mode == RUN){
-				
-				if ((*step_eng).slowdownCNT != 0){
-					(*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT 
-									+ (*step_eng).dir * (*step_eng).slowdownCNT;
-					(*step_eng).mode = SLOWDOWN;
-					
-					HAL_DMA_Start_IT((*step_eng).engine_TIM_master->hdma[TIM_DMA_ID_UPDATE], 
-					(uint32_t)((*step_eng).slowdownbuf 
-									+ (*step_eng).accel_size - (*step_eng).slowdownCNT),
-					(uint32_t)&(*step_eng).engine_TIM_master->Instance->ARR, (*step_eng).slowdownCNT);
-					
-					__HAL_TIM_ENABLE_DMA((*step_eng).engine_TIM_master, TIM_DMA_UPDATE);
-				} else {
-					if (!(*step_eng).manual_mode || (*step_eng).start_pose_mode) {
-						ctrl.programms->state = STATE_READ_COMMAND;
-					}
-					HAL_TIM_OC_Stop((*step_eng).engine_TIM_master, TIM_CHANNEL_3);
-					(*step_eng).mode = STOP;
-					HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_SET);
-				}
-			}
+    		run_step(step_eng);
+		}
     	else
     	if((*step_eng).mode == SLOWDOWN){
-    		if (!(*step_eng).manual_mode) {
-    			ctrl.programms->state = STATE_READ_COMMAND;
-    		}
-    		if ((*step_eng).start_pose_mode) {
-    			t_queue_dicr disc;
-
-    			ctrl.programms->state = STATE_SAND_REQUEST;
-
-    			disc.state = HOME_IS_REACHED;
-    			ringBuf_put(disc, ctrl.queue);
-    		}
-
-    		HAL_TIM_OC_Stop((*step_eng).engine_TIM_master, TIM_CHANNEL_3);
-			HAL_DMA_Abort_IT((*step_eng).engine_TIM_master->hdma[TIM_DMA_ID_UPDATE]);
-    		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_SET);
-			(*step_eng).mode = STOP;
+    		speed_down_step(step_eng);
     	}
     }
+}
+
+/*
+* @bref: control step engine before speedUp stage
+*	@param (step_eng) - Step engine structure
+*/
+void speed_up_step(t_step_engine *step_eng) {
+	if (!(*step_eng).manual_mode || (*step_eng).start_pose_mode) {
+		(*step_eng).engine_TIM_slave->Instance->CCR1 =
+				(*step_eng).engine_TIM_slave->Instance->CNT
+						+ (*step_eng).dir * (*step_eng).runCNT;
+
+		(*step_eng).mode = RUN;
+	} else if (is_start_pos) {
+		(*step_eng).engine_TIM_slave->Instance->CCR1 = START_POS_VALUE;
+		(*step_eng).mode = RUN;
+	} else {
+		(*step_eng).engine_TIM_slave->Instance->CCR1 =
+				(*step_eng).engine_TIM_slave->Instance->CNT
+						+ (*step_eng).dir * (*step_eng).runCNT;
+
+		if (!(*step_eng).manual_move_left && !(*step_eng).manual_move_right) {
+			(*step_eng).mode = RUN;
+		}
+	}
+	(*step_eng).engine_TIM_master->Instance->ARR = (uint16_t) 1
+			/ (*step_eng).vel;
+}
+
+/*
+* @bref: control step engine before run stage
+*	@param (step_eng) - Step engine structure
+*/
+void run_step(t_step_engine *step_eng) {
+	if ((*step_eng).slowdownCNT != 0) {
+		(*step_eng).engine_TIM_slave->Instance->CCR1 =
+				(*step_eng).engine_TIM_slave->Instance->CNT
+						+ (*step_eng).dir * (*step_eng).slowdownCNT;
+
+		(*step_eng).mode = SLOWDOWN;
+
+		HAL_DMA_Start_IT((*step_eng).engine_TIM_master->hdma[TIM_DMA_ID_UPDATE],
+				(uint32_t) ((*step_eng).slowdownbuf + (*step_eng).accel_size
+						- (*step_eng).slowdownCNT),
+				(uint32_t) &(*step_eng).engine_TIM_master->Instance->ARR,
+				(*step_eng).slowdownCNT);
+
+		__HAL_TIM_ENABLE_DMA((*step_eng).engine_TIM_master, TIM_DMA_UPDATE);
+	} else {
+		if (!(*step_eng).manual_mode || (*step_eng).start_pose_mode) {
+			ctrl.programms->state = STATE_READ_COMMAND;
+		}
+		HAL_TIM_OC_Stop((*step_eng).engine_TIM_master, TIM_CHANNEL_3);
+		(*step_eng).mode = STOP;
+		HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_SET);
+	}
+}
+
+/*
+* @bref: control step engine before speedDown stage
+*	@param (step_eng) - Step engine structure
+*/
+void speed_down_step(t_step_engine *step_eng) {
+	if (!(*step_eng).manual_mode) {
+		ctrl.programms->state = STATE_READ_COMMAND;
+	}
+	if ((*step_eng).start_pose_mode) {
+		t_queue_dicr disc;
+
+		ctrl.programms->state = STATE_SAND_REQUEST;
+
+		disc.state = HOME_IS_REACHED;
+		ringBuf_put(disc, ctrl.queue);
+	}
+
+	HAL_TIM_OC_Stop((*step_eng).engine_TIM_master, TIM_CHANNEL_3);
+	HAL_DMA_Abort_IT((*step_eng).engine_TIM_master->hdma[TIM_DMA_ID_UPDATE]);
+	HAL_GPIO_WritePin(GPIOC, GPIO_PIN_12, GPIO_PIN_SET);
+	(*step_eng).mode = STOP;
 }

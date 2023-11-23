@@ -28,7 +28,6 @@ void init_HMI(t_control* contrl) {
 			contrl->HMI_curves[i].tim->Instance->ARR = PLC_RATE /
 						(contrl->HMI_curves[i].tim->Instance->PSC * contrl->HMI_curves[i].refresh_rate);
 
-//			contrl->HMI_curves[i].tim->Instance->ARR = 60000;
 			contrl->HMI_curves[i].tim->Instance->CR1 |= TIM_CR1_CEN;
 
 			HAL_TIM_Base_Start_IT(contrl->HMI_curves[i].tim);
@@ -320,22 +319,22 @@ void eHMIPoll(t_control* contrl, int* usRegBuf) {
 #if HAL_ADC_MODULE_ENABLED && VACUUM_SENSOR_ENABLE
 	contrl->dev->vac_sensor->cur_pres = get_value(contrl->dev->vac_sensor->adc);
 
-	switch (is_setpoint(contrl->dev->vac_pump, contrl->dev->vac_sensor)) {
-	case VAC_SETPOINT_REACHED:
+	if (contrl->dev->vac_pump->state == PUMP_IS_ON) {
+		switch (is_setpoint(contrl->dev->vac_pump, contrl->dev->vac_sensor)) {
 
-		//TO DO: make upperBoard and lower measurement boundary
+		case VAC_SETPOINT_LOWER:
 
-		break;
-	case VAC_SETPOINT_LOWER:
+			//TO DO: pump ON
+			pump_ON();
 
-		//TO DO: pump ON
+			break;
+		case VAC_SETPOINT_UPPER:
 
-		break;
-	case VAC_SETPOINT_UPPER:
+			//TO DO: pump OFF
+			pump_OFF();
 
-		//TO DO: pump ON
-
-		break;
+			break;
+		}
 	}
 #endif
 
@@ -372,7 +371,8 @@ void eHMIPoll(t_control* contrl, int* usRegBuf) {
 		#endif
 		}
 		else if (strcmp(contrl->programms->com_dscr.name, "VS") == 0) {
-			//pump_ON(&contrl->is_pump_ON);
+			contrl->dev->vac_pump->setpoint = contrl->programms->par1;
+			set_pump_state(contrl->dev->vac_pump, PUMP_IS_ON);
 		}
 
 		break;
@@ -501,27 +501,13 @@ void search_home(t_control* contrl) {
 * @res - result of checking
 */
 eVacSetPoint is_setpoint(t_vac_pump* vPump, t_vac_sen* vSen) {
-
-	if (vSen->cur_pres == vPump->setpoint) {
-		return VAC_SETPOINT_REACHED;
-	} else if (vSen->cur_pres > vPump->setpoint) {
+	if (vSen->cur_pres >= vPump->setpoint + vPump->offset) {
 		return VAC_SETPOINT_LOWER;
-	} else if (vSen->cur_pres < vPump->setpoint) {
+	} else if (vSen->cur_pres < vPump->setpoint - vPump->offset) {
 		return VAC_SETPOINT_UPPER;
 	}
 
 }
-
-
-/* ON/OFF Vacuum pump */
-void pump_ON( t_vac_pump* v_pump ) {
-
-}
-void pump_OFF( t_vac_pump* v_pump ) {
-
-}
-
-extern UART_HandleTypeDef huart1;
 
 void send_data_curve(uint8_t ucSlaveAddress, uint16_t data, uint8_t curve) {
 	static uint8_t mdata[14] = { 0x00 };
@@ -570,21 +556,25 @@ void TIM6_DAC_IRQHandler(void)
 }
 
 
+/**
+  * @brief This function handles PB7 - signal from limit switch.
+  */
 void EXTI9_5_IRQHandler(void){
-	//pump_OFF(&ctrl.is_pump_ON);
-	EXTI->PR |= EXTI_PR_PR7;
+
+	//int i = ctrl.dev->step_engine[used_eng].engine_TIM_slave->Instance->CNT;
+
+	if (EXTI->PR & EXTI_PR_PR7) {
+		run_step(&ctrl.dev->step_engine[0]);
+		EXTI->PR |= EXTI_PR_PR7;
+	} else if (EXTI->PR & EXTI_PR_PR9) {
+		run_step(&ctrl.dev->step_engine[1]);
+		EXTI->PR |= EXTI_PR_PR9;
+	}
 }
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
 
-	int value;
-
 	if (hadc->Instance == ADC1) {
 		ctrl.dev->vac_sensor->cur_pres = HAL_ADC_GetValue(hadc);
-		//value = HAL_ADC_GetValue(hadc);
-		//dac.dac_type->DHR12R1 = value;
-		//ctrl.dev->bldc_engine->power = ctrl.dev->vac_sensor->cur_pres;
-
-		//dac.dac_type->DHR12R1 = ctrl.dev->vac_sensor->cur_pres;
 	}
 }

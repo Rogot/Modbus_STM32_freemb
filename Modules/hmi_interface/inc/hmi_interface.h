@@ -10,6 +10,7 @@
 #include "vacum_sens.h"
 #include "vacum_pump.h"
 #include "step_engine.h"
+#include "limit_switch.h"
 
 /* DWIN UTILS */
 #include "proc_func.h"
@@ -125,8 +126,6 @@ void send_request(uint8_t ucSlaveAddress, uint8_t* data, uint8_t cmd, uint8_t le
 
 /* Vacuum pump */
 eVacSetPoint is_setpoint(t_vac_pump* vPump, t_vac_sen* vSen);
-void pump_ON( t_vac_pump* v_pump );
-void pump_OFF( t_vac_pump* v_pump );
 
 /* HMI functions */
 void eHMIPoll();
