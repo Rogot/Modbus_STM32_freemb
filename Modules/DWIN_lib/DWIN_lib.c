@@ -30,7 +30,7 @@ UART_HandleTypeDef* DWIN_uart;
 
 /* ----------------------- Extern variables ---------------------------------*/
 
-extern prog_dscrptr pr_dscr;
+extern t_control ctrl;
 
 extern eDWINEventType eQueuedEvent;
 
@@ -289,6 +289,9 @@ void eDWINFuncWriteRegister(UCHAR * pucFrame, int * registers, USHORT * usLen) {
 			
 			/* convect HMI address to PLC address */
 			usRegAddress = conv_addr(PLC_addr, usRegAddress);
+			if (usRegAddress == 404) {
+				return;
+			}
 			
 			ucLength++;
 			
@@ -394,12 +397,13 @@ eDWINErrorCode eDWINPoll( void ) {
 			//}
 			//else if (ucFunctionCode == FUNC_CODE_WRITE) {
 			if (ucDWINBuf[DWIN_ADDR_START_DATA_POS] == '#') {
-
-				pr_dscr.size = copy_to((UCHAR*) ucDWINBuf, pr_dscr.usDataRx,
+				ctrl.programms[ctrl.exe_prog].size = copy_to(
+						(UCHAR*) ucDWINBuf,
+						ctrl.programms[ctrl.exe_prog].usDataRx,
 						DWIN_ADDR_START_DATA_POS,
 						ucDWINBuf[DWIN_ADDR_START_DATA_LEN] * 2);
 				clear(ucDWINBuf, ucDWINBuf[DWIN_ADDR_START_DATA_LEN] * 2);
-				pr_dscr.state = STATE_READ_COMMAND;
+				ctrl.programms[ctrl.exe_prog].state = STATE_READ_COMMAND;
 			} else if (ucFunctionCode == FUNC_CODE_READ) {
 				eDWINFuncWriteRegister((UCHAR*) ucDWINBuf, ucRegistersBuf,
 						&usLength);

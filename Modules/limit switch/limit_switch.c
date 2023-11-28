@@ -1,6 +1,6 @@
 #include "limit_switch.h"
 
-void limit_siwitch_init(t_LSPort* port, uint8_t used_engine) {
+void limit_siwitch_init(t_LSPort* port) {
 
 
 	RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN; /* Enable alternative functions */

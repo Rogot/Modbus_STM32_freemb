@@ -34,6 +34,8 @@ eProcState proccesing_HMI_request(prog_dscrptr* pd) {
 			pd->par1 = atoi(pd->com_dscr.p1);
 		} else if (strcmp(pd->com_dscr.name, "VS") == 0) {
 			pd->par1 = atoi(pd->com_dscr.p1);
+		} else if (strcmp(pd->com_dscr.name, "DL") == 0) {
+			pd->par1 = atoi(pd->com_dscr.p1);
 		}
 	} else {
 		return STATE_END_PROGRAMM;

@@ -10,8 +10,6 @@
 #include "vacum_sens.h"
 #include "vacum_pump.h"
 #include "step_engine.h"
-#include "limit_switch.h"
-
 /* DWIN UTILS */
 #include "proc_func.h"
 #include "config_DWIN.h"
@@ -61,6 +59,10 @@
 #define VACUUM_TIME								( 20 )		 			/* 5024 */
 
 #define CURV_MAX_NUM							( 8 )
+
+/*DELAY*/
+#define DELAY_PSC_BASE							( 36000 )
+#define DELAY_ARR_BASE							( 2 )
 /* REGISTERS DEFINES END */
 
 typedef enum {
@@ -114,6 +116,7 @@ void move_SE_to(t_control* contrl, uint8_t num);
 void munual_mode(t_control* contrl, uint8_t num);
 void move_start_pos(t_control* contrl, uint8_t num);
 void search_home();
+void reach_lim_switch(t_step_engine* step_eng);
 
 /* BLDC Engine*/
 void control_BLCD(t_control* contrl);
@@ -129,8 +132,9 @@ eVacSetPoint is_setpoint(t_vac_pump* vPump, t_vac_sen* vSen);
 
 /* HMI functions */
 void eHMIPoll();
-void init_HMI(t_control* contrl);
+void init_HMI(t_control* contrl, int* usRegBuf);
 void send_data_curve(uint8_t ucSlaveAddress, uint16_t data, uint8_t curve);
 void refresh_curv( t_control* contrl );
+void start_delay(prog_dscrptr*  programm, uint8_t num);
 
 #endif //!HMI_INTERFACE_H

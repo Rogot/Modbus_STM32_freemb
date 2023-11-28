@@ -1,11 +1,9 @@
 #include "hmi_interface.h"
 #include <stdlib.h>
 
-prog_dscrptr pr_dscr;
 t_control ctrl;
 extern uint8_t is_start_pos;
 extern t_addr_conv PLC_addr[PLC_ADDR_MAX];
-prog_dscrptr* current_program;
 
 static uint8_t usLenth = 0;
 
@@ -16,10 +14,22 @@ peHMISendRequest peHMISendRequestCur;
 /*
 * @bref: inital function for HMI
 * @param (contrl) - all parameters for controlling by HMI
+* @param (usRegBuf) - registers buffer
 */
-void init_HMI(t_control* contrl) {
+void init_HMI(t_control* contrl, int* usRegBuf) {
 
 
+	/* Initialization timer for "DL" command via HMI */
+	RCC->APB2ENR |= RCC_APB2ENR_TIM9EN; /* Enable TIM9 */
+
+	TIM9->CR1 &= ~TIM_CR1_CEN;
+	TIM9->SR &= ~TIM_SR_UIF;
+	TIM9->CR1 &= ~TIM_CR1_CEN;
+
+	TIM9->DIER |= TIM_DIER_UIE; /* Update interrupt enable */
+	TIM9->PSC = DELAY_PSC_BASE; /* 72 MHz / 36000 = 2 kHz */
+	TIM9->ARR = DELAY_ARR_BASE /* 2000 Hz / 2 = 1000 Hz = 1 ms */;
+	NVIC_EnableIRQ(TIM1_BRK_TIM9_IRQn);
 
 	for (uint8_t i = 0; i < CURV_MAX_NUM; i++) {
 		if (contrl->HMI_curves[i].tim != NULL) {
@@ -36,9 +46,17 @@ void init_HMI(t_control* contrl) {
 		}
 	}
 
+
+	usRegBuf[NUM_EXE_PROGRAM] = 1;
 	contrl->exe_prog = 0x01;
 
-	read_program(current_program, 0);
+	CMSIS_flash_allow_access();
+
+	load_prog_FLASH(contrl);
+
+	for (uint8_t i = 0; i < MAX_PRGRMS_NUM; i++) {
+		contrl->programms[i].state = STATE_IDLE_COMMAND;
+	}
 }
 
 /*
@@ -87,10 +105,11 @@ uint8_t write_program(prog_dscrptr* prog, uint16_t num){
 
 	uint8_t struct_size = sizeof(prog_dscrptr);
 	
-	uint8_t* data_ptr = malloc(num);
+//	uint8_t* data_ptr = malloc(num);
+	uint8_t* data_ptr;
 	
-	CMSIS_flash_allow_access();
-	CMSIS_internal_flash_erase(FLASH_SNB_SEC_3);
+//	CMSIS_flash_allow_access();
+//	CMSIS_internal_flash_erase(FLASH_SNB_SEC_3);
 	
 	data_ptr = (uint8_t*)&(*prog);
 	CMSIS_internal_flash_write(data_ptr, BASE_PROGRAM_ADDRESS, num * sizeof(prog_dscrptr));
@@ -100,7 +119,6 @@ uint8_t write_program(prog_dscrptr* prog, uint16_t num){
 	//	temp[i] = (t_hmi_reg*)&(*(data_ptr[i])); 
 	//}
 	//free(temp);
-	free(data_ptr);
 	
 	return 1;
 }
@@ -113,16 +131,17 @@ uint8_t write_program(prog_dscrptr* prog, uint16_t num){
 
 void read_program(prog_dscrptr* program, uint8_t num) {
 	prog_dscrptr* temp_program;
-	uint32_t* temp = malloc(sizeof(prog_dscrptr));
+	uint8_t* temp = malloc(sizeof(prog_dscrptr));
 	
-	for (uint16_t i = 0; i < sizeof(prog_dscrptr) / sizeof(uint32_t); i++){
+	for (uint16_t i = 0; i < sizeof(prog_dscrptr) / sizeof(uint8_t); i++){
 		temp[i] = CMSIS_internal_flash_read(BASE_PROGRAM_ADDRESS
-											+ (sizeof(prog_dscrptr) * num) + sizeof(uint32_t) * i);
+											+ (sizeof(prog_dscrptr) * num) + sizeof(uint8_t) * i);
 	}
 	
 	temp_program = (prog_dscrptr*)&(*(temp));
 	
 	memcpy(&program[num], temp_program, (sizeof(prog_dscrptr)));
+	free(temp);
 }
 
 /*
@@ -147,14 +166,14 @@ void move_SE(t_control* contrl, uint8_t num) {
 		#if !STEP_ENGINE_TEST_ENABLE
 		if (contrl->is_manual == 0x00 && contrl->is_launch == 0x01
 		&& contrl->dev->step_engine->mode == STOP) {
-			contrl->programms->state = STATE_BUSY_COMMAND;
-			if (contrl->programms->par2 > MAX_VEL_PROG) {
-				contrl->programms->par2 = MAX_VEL_PROG;
+			contrl->programms[contrl->exe_prog].state = STATE_BUSY_COMMAND;
+			if (contrl->programms[contrl->exe_prog].par2 > MAX_VEL_PROG) {
+				contrl->programms[contrl->exe_prog].par2 = MAX_VEL_PROG;
 			}
 
 			move_step_engine(&contrl->dev->step_engine[num],
-					calc_steps(contrl->programms->par1) * RATIO_GEARBOX,
-					(float) ((float) contrl->programms->par2 * RATIO_GEARBOX / BASE_FREQ
+					calc_steps(contrl->programms[contrl->exe_prog].par1) * RATIO_GEARBOX,
+					(float) ((float) contrl->programms[contrl->exe_prog].par2 * RATIO_GEARBOX / BASE_FREQ
 							/ ANFLE_ONE_STEP * 2));
 		}
 		/* Legacy code */
@@ -186,13 +205,13 @@ void move_SE_to(t_control* contrl, uint8_t num) {
 #if !STEP_ENGINE_TEST_ENABLE
 
 	if (contrl->is_manual == 0x00 && contrl->is_launch >= 0x01
-			&& contrl->dev->step_engine->mode == STOP) {
-		contrl->programms->state = STATE_BUSY_COMMAND;
-		if (contrl->programms->par2 > MAX_VEL_PROG) {
-			contrl->programms->par2 = MAX_VEL_PROG;
-		} else if (contrl->programms->par2 > 0x0) {
+			&& contrl->dev->step_engine[num].mode == STOP) {
+		contrl->programms[contrl->exe_prog].state = STATE_BUSY_COMMAND;
+		if (contrl->programms[contrl->exe_prog].par2 > MAX_VEL_PROG) {
+			contrl->programms[contrl->exe_prog].par2 = MAX_VEL_PROG;
+		} else if (contrl->programms[contrl->exe_prog].par2 > 0x0) {
 
-			uint32_t start_pos = START_POS_VALUE + calc_steps(contrl->programms->par1) * RATIO_GEARBOX;
+			uint32_t start_pos = START_POS_VALUE + calc_steps(contrl->programms[contrl->exe_prog].par1) * RATIO_GEARBOX;
 			uint32_t cur_pos = contrl->dev->step_engine[num].
 							engine_TIM_slave->Instance->CCR1;
 
@@ -200,13 +219,13 @@ void move_SE_to(t_control* contrl, uint8_t num) {
 
 			if (res > 1 || res < -1) {
 				move_step_engine(&contrl->dev->step_engine[num], (int16_t )(res), (float)(
-									(float)contrl->programms->par2 * RATIO_GEARBOX / BASE_FREQ
+									(float)contrl->programms[contrl->exe_prog].par2 * RATIO_GEARBOX / BASE_FREQ
 									/ ANFLE_ONE_STEP * 2));
 			} else {
-				contrl->programms->state = STATE_READ_COMMAND;
+				contrl->programms[contrl->exe_prog].state = STATE_READ_COMMAND;
 			}
 		} else {
-			contrl->programms->state = STATE_READ_COMMAND;
+			contrl->programms[contrl->exe_prog].state = STATE_READ_COMMAND;
 		}
 	}
 #endif
@@ -219,14 +238,14 @@ void move_SE_to(t_control* contrl, uint8_t num) {
 void control_BLCD(t_control* contrl) {
 	if (contrl->is_manual == 0x00 && contrl->is_launch >= 0x01) {
 
-		contrl->dev->bldc_engine->power = contrl->programms->par1;
+		contrl->dev->bldc_engine->power = contrl->programms[contrl->exe_prog].par1;
 
 		if (contrl->dev->bldc_engine->power > 0) {
 			start_BLDC(contrl->dev->bldc_engine, contrl->dev->bldc_engine->power);
 		} else {
 			stop_BLDC(contrl->dev->bldc_engine);
 		}
-		contrl->programms->state = STATE_READ_COMMAND;
+		contrl->programms[contrl->exe_prog].state = STATE_READ_COMMAND;
 	}
 }
 
@@ -236,12 +255,13 @@ void control_BLCD(t_control* contrl) {
 */
 
 void refresh_prog_parameters_FLASH(t_control* contrl) {
+	CMSIS_internal_flash_erase(FLASH_SNB_SEC_3);
 	for (uint8_t i = 0; i < MAX_PRGRMS_NUM; i++) {
 		write_program(contrl->programms, i);
 	}
 	for (uint8_t i = 0; i < MAX_PRGRMS_NUM; i++) {
 		read_program(contrl->programms, i);
-	} 
+	}
 }
 
 /*
@@ -261,15 +281,16 @@ void load_prog_FLASH(t_control* contrl) {
 * @param (num) - num of engine (choose an engine which control)
 */
 void munual_mode(t_control* contrl, uint8_t num) {
-	contrl->dev->step_engine->manual_mode = 0x01;
-	if (contrl->current_vel != 0x00) {
-		if (contrl->dev->step_engine->manual_move_left) {
-			move_step_engine(&contrl->dev->step_engine[num], 2 * RATIO_GEARBOX,
+	contrl->dev->step_engine[num].manual_mode = 0x01;
+
+	if (contrl->current_vel != 0x00 && contrl->dev->step_engine[num].mode == STOP) {
+		if (contrl->dev->step_engine[num].manual_move_left) {
+			move_step_engine(&contrl->dev->step_engine[num], BASE_STEP_MANUAL * RATIO_GEARBOX,
 					(float) ((float) contrl->current_vel / BASE_FREQ
 					/ ANFLE_ONE_STEP * 2));
 		}
-		else if (contrl->dev->step_engine->manual_move_right) {
-			move_step_engine(&contrl->dev->step_engine[num], -2 * RATIO_GEARBOX,
+		else if (contrl->dev->step_engine[num].manual_move_right) {
+			move_step_engine(&contrl->dev->step_engine[num], -BASE_STEP_MANUAL * RATIO_GEARBOX,
 					(float) ((float) contrl->current_vel / BASE_FREQ
 					/ ANFLE_ONE_STEP * 2));
 		}
@@ -296,7 +317,7 @@ void move_start_pos(t_control* contrl, uint8_t num) {
 
 		t_queue_dicr discr;
 
-		contrl->programms->state = STATE_SAND_REQUEST;
+		contrl->programms[contrl->exe_prog].state = STATE_SAND_REQUEST;
 
 		discr.state = HOME_IS_REACHED;
 		ringBuf_put(discr, contrl->queue);
@@ -338,41 +359,47 @@ void eHMIPoll(t_control* contrl, int* usRegBuf) {
 	}
 #endif
 
-	switch (contrl->programms->state) {
+	switch (contrl->programms[contrl->exe_prog].state) {
 	case STATE_IDLE_COMMAND:
-		contrl->programms->read_cnt = 0;
+		contrl->programms[contrl->exe_prog].read_cnt = 0;
+		if (contrl->is_launch >= 0x01) {
+			contrl->programms[contrl->exe_prog].state = STATE_READ_COMMAND;
+		}
 		break;
 
 	case STATE_READ_COMMAND:
 
-		pState = proccesing_HMI_request(contrl->programms);
+		pState = proccesing_HMI_request(&contrl->programms[contrl->exe_prog]);
 
 		if (pState == STATE_END_PROGRAMM) {
-			contrl->programms->state = STATE_SAND_REQUEST;
+			contrl->programms[contrl->exe_prog].state = STATE_SAND_REQUEST;
 			discr.state = END_PROGRAMM;
 			ringBuf_put(discr, contrl->queue);
 		}
 		break;
 
 	case STATE_EXECUTE_COMMAND:
-		if (strcmp(contrl->programms->com_dscr.name, "AX1") == 0) {
+		if (strcmp(contrl->programms[contrl->exe_prog].com_dscr.name, "AX1") == 0) {
 		#if STEP_ENGINE_ENABLE
 			move_SE_to(contrl, 0);
 		#endif
 		}
-		else if (strcmp(contrl->programms->com_dscr.name, "AX2") == 0) {
+		else if (strcmp(contrl->programms[contrl->exe_prog].com_dscr.name, "AX2") == 0) {
 		#if STEP_ENGINE_ENABLE
 			move_SE_to(contrl, 1);
 		#endif
 		}
-		else if (strcmp(contrl->programms->com_dscr.name, "MIX") == 0) {
+		else if (strcmp(contrl->programms[contrl->exe_prog].com_dscr.name, "MIX") == 0) {
 		#if BLDC_ENGINE_ENABLE
 			control_BLCD(contrl);
 		#endif
 		}
-		else if (strcmp(contrl->programms->com_dscr.name, "VS") == 0) {
-			contrl->dev->vac_pump->setpoint = contrl->programms->par1;
+		else if (strcmp(contrl->programms[contrl->exe_prog].com_dscr.name, "VS") == 0) {
+			contrl->dev->vac_pump->setpoint = contrl->programms[contrl->exe_prog].par1;
 			set_pump_state(contrl->dev->vac_pump, PUMP_IS_ON);
+		}
+		else if (strcmp(contrl->programms[contrl->exe_prog].com_dscr.name, "DL") == 0) {
+			start_delay(contrl->programms, contrl->exe_prog);
 		}
 
 		break;
@@ -410,31 +437,39 @@ void eHMIPoll(t_control* contrl, int* usRegBuf) {
 		discr.state = NONE_REQUEST;
 
 		if (discr.state == NONE_REQUEST && contrl->is_launch != 0) {
-			contrl->programms->state = STATE_READ_COMMAND;
+			contrl->programms[contrl->exe_prog].state = STATE_READ_COMMAND;
 		} else if (discr.state == NONE_REQUEST && contrl->is_launch == 0) {
-			contrl->programms->state = STATE_IDLE_COMMAND;
+			contrl->programms[contrl->exe_prog].state = STATE_IDLE_COMMAND;
 		}
 		break;
 	}
 
 	#if STEP_ENGINE_ENABLE
-	if( contrl->is_manual == 0x01 && contrl->is_launch == 0x00
-				&& contrl->dev->step_engine->mode == STOP){
+	if( contrl->is_manual >= 0x01 && contrl->is_launch == 0x00 ){
 		contrl->is_manual = 0x00;
-		contrl->dev->step_engine->start_pose_mode = 0x00;
+		//contrl->dev->step_engine[usRegBuf[STEP_ENGINE_CHOOSE] - 1].start_pose_mode = 0x00;
 		if (usRegBuf[STEP_ENGINE_CHOOSE] > 0) {
 			munual_mode(contrl, usRegBuf[STEP_ENGINE_CHOOSE] - 1);
 		}
 	}
 	
-	if ((contrl->start_pos_step_engine && 0xFF) == 0x01
-			&& contrl->dev->step_engine->mode == STOP) {
-		contrl->dev->step_engine->start_pose_mode = 0x01;
-		contrl->programms->state = STATE_BUSY_COMMAND;
-		if (usRegBuf[STEP_ENGINE_CHOOSE] > 0) {
+	if ((contrl->start_pos_step_engine && 0xFF) == 0x01) {
+		if (usRegBuf[STEP_ENGINE_CHOOSE] > 0
+				&& contrl->dev->step_engine[usRegBuf[STEP_ENGINE_CHOOSE] - 1].mode == STOP ) {
+			contrl->dev->step_engine[usRegBuf[STEP_ENGINE_CHOOSE] - 1].start_pose_mode = 0x01;
+			contrl->programms[contrl->exe_prog].state = STATE_BUSY_COMMAND;
 			move_start_pos(contrl, usRegBuf[STEP_ENGINE_CHOOSE] - 1);
 		}
 	}
+
+	/* Reach limit switch */
+	for (uint8_t idx = 0; idx < ENGINE_NUM; idx++) {
+		if (contrl->dev->step_engine[idx].is_lim_sw) {
+			//contrl->dev->step_engine[idx].is_lim_sw = 0x0;
+			reach_lim_switch(&contrl->dev->step_engine[idx]);
+		}
+	}
+
 	#endif
 
 	/* Sending current vacuum value */
@@ -449,6 +484,16 @@ void eHMIPoll(t_control* contrl, int* usRegBuf) {
 		refresh_prog_parameters_FLASH(contrl);
 	}
 	#endif
+}
+
+void reach_lim_switch(t_step_engine* step_eng) {
+	uint32_t start_pos = step_eng->limit_switch_coord;
+	uint32_t cur_pos = step_eng->engine_TIM_slave->Instance->CNT;
+
+	int32_t res = (uint32_t) start_pos - (uint32_t) cur_pos;
+
+	move_step_engine(step_eng, (int16_t) (res),
+			(float) ((float) 5 * RATIO_GEARBOX / BASE_FREQ / ANFLE_ONE_STEP * 2));
 }
 
 /*
@@ -468,10 +513,12 @@ void refresh_reg(t_control* contrl, int* usRegBuf) {
 
 	contrl->exe_prog = usRegBuf[NUM_EXE_PROGRAM] - 1;
 	
-	contrl->dev->step_engine->manual_move_left = (uint8_t)usRegBuf[STEP_ENGINE_MOVE_LEFT];
-	contrl->dev->step_engine->manual_move_right = (uint8_t)usRegBuf[STEP_ENGINE_MOVE_RIGHT];
-}
 
+	for (uint8_t i = 0; i < ENGINE_NUM; i++) {
+		contrl->dev->step_engine[i].manual_move_left = (uint8_t)usRegBuf[STEP_ENGINE_MOVE_LEFT];
+		contrl->dev->step_engine[i].manual_move_right = (uint8_t)usRegBuf[STEP_ENGINE_MOVE_RIGHT];
+	}
+}
 /*
 * @bref: search start position - "0" via end cap
 * @param (contrl) - all parameters for controlling by HMI
@@ -535,6 +582,12 @@ void send_data_curve(uint8_t ucSlaveAddress, uint16_t data, uint8_t curve) {
 	peHMISendRequestCur(ucSlaveAddress, mdata, usLength);
 }
 
+void start_delay(prog_dscrptr*  programm, uint8_t num) {
+	programm[num].state = STATE_BUSY_COMMAND;
+	TIM9->ARR *= programm[num].par1;
+	TIM9->CR1 |= TIM_CR1_CEN;
+}
+
 /****** IRQ Handlers ******/
 
 /**
@@ -561,15 +614,29 @@ void TIM6_DAC_IRQHandler(void)
   */
 void EXTI9_5_IRQHandler(void){
 
-	//int i = ctrl.dev->step_engine[used_eng].engine_TIM_slave->Instance->CNT;
+	uint32_t cur_coord_1 = ctrl.dev->step_engine[0].engine_TIM_slave->Instance->CNT;
+	uint32_t cur_coord_2 = ctrl.dev->step_engine[1].engine_TIM_slave->Instance->CNT;
+
 
 	if (EXTI->PR & EXTI_PR_PR7) {
+		ctrl.dev->step_engine[0].limit_switch_coord = cur_coord_1;
+		ctrl.dev->step_engine[0].is_lim_sw = 0x1;
 		run_step(&ctrl.dev->step_engine[0]);
 		EXTI->PR |= EXTI_PR_PR7;
-	} else if (EXTI->PR & EXTI_PR_PR9) {
+	}
+	if (EXTI->PR & EXTI_PR_PR9) {
+		ctrl.dev->step_engine[1].limit_switch_coord = cur_coord_2;
+		ctrl.dev->step_engine[1].is_lim_sw = 0x1;
 		run_step(&ctrl.dev->step_engine[1]);
 		EXTI->PR |= EXTI_PR_PR9;
 	}
+}
+
+void TIM1_BRK_TIM9_IRQHandler(void) {
+	ctrl.programms[ctrl.exe_prog].state = STATE_READ_COMMAND;
+	TIM9->SR &= ~TIM_SR_UIF;
+	TIM9->CR1 &= ~TIM_CR1_CEN;
+	TIM9->ARR = DELAY_ARR_BASE;
 }
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {

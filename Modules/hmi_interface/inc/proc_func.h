@@ -8,6 +8,7 @@
 #define DATA_RX_MAX_SIZE								( 255 )
 #define MAX_SIZE_COMMAND								( 15 )
 #define MAX_SIZE_PARAMETR								( 10 )
+#define MAX_NAME_SIZE									( 4 )
 
 /*********** symbolic defines ***********/
 #define TWO_BYTE_CNTRL_SIGN								( 1 )
@@ -27,7 +28,7 @@ typedef enum
 
 typedef struct COMMAND_DISCR 
 {
-	uint8_t name[4];
+	uint8_t name[MAX_NAME_SIZE];
 	uint8_t p1[MAX_SIZE_PARAMETR];
 	uint8_t p2[MAX_SIZE_PARAMETR];
 	uint8_t p3[MAX_SIZE_PARAMETR];

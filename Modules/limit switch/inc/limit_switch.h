@@ -8,6 +8,6 @@ typedef struct LSPort {
 	uint8_t port_number;
 }t_LSPort;
 
-void limit_siwitch_init(t_LSPort* port, uint8_t used_engine);
+void limit_siwitch_init(t_LSPort* ls);
 
 #endif /*LIMIT_SWITCH_H*/

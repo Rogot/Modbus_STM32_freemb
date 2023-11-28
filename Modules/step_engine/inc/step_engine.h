@@ -5,6 +5,7 @@
 #include "stm32f4xx_hal.h"
 #include <stdio.h>
 #include "math.h"
+#include "limit_switch.h"
 
 #include "config_DWIN.h"
 
@@ -27,6 +28,8 @@
 
 #define STEP_ONE_PULSE							2
 #define RATIO_GEARBOX							14 * STEP_ONE_PULSE
+#define BASE_STEP_MANUAL						10
+
 
 #define STOP 									1
 #define SPEEDUP 								2
@@ -49,7 +52,6 @@ typedef struct STEP_ENGINE {
 	uint32_t speedupCNT;
 	uint32_t runCNT;
 	uint32_t slowdownCNT;
-	uint32_t pres_CNT;
 	int16_t cnt;
 	uint8_t manual_mode;
 	uint8_t start_pose_mode;
@@ -57,6 +59,8 @@ typedef struct STEP_ENGINE {
 	uint8_t manual_move_left;
 	TIM_HandleTypeDef* engine_TIM_master; //TIM3
 	TIM_HandleTypeDef* engine_TIM_slave; //TIM2
+	uint8_t is_lim_sw;
+	uint32_t limit_switch_coord;
 } t_step_engine;
 
 void init_step_engine(t_step_engine* step_eng,

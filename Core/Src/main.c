@@ -70,11 +70,11 @@ DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
 extern t_control ctrl;
-extern prog_dscrptr pr_dscr;
 extern uint8_t start;
 extern uint8_t print;
 extern t_step_engine step_engines[2];
 
+prog_dscrptr programms[MAX_PRGRMS_NUM];
 
 t_vac_sen vac_sensor;
 t_vac_pump vac_pump;
@@ -243,12 +243,12 @@ int main(void)
 	#if PEREPH_ENABLE
 	
 	ctrl.dev = &dev;
-	ctrl.programms = &pr_dscr;
+	ctrl.programms = programms;
 
 	ctrl.HMI_curves[0].refresh_rate = 2;
 	ctrl.HMI_curves[0].tim = &htim7;
 	
-	init_HMI(&ctrl);
+	init_HMI(&ctrl, ucRegistersBuf);
 	#endif
 	
 	#if STEP_ENGINE_ENABLE
@@ -267,7 +267,9 @@ int main(void)
 	port.port_letter = 'B';
 	port.port_number = 7;
 
-	limit_siwitch_init(&port, 0);
+	limit_siwitch_init(&port);
+//	step_engines[0].limit_switch = port;
+
 	/* Initial Y-axes step engine */
 	
 	init_step_engine(&step_engines[1], &htim4, &htim5);
@@ -275,7 +277,9 @@ int main(void)
 	port.port_letter = 'B';
 	port.port_number = 9;
 
-	limit_siwitch_init(&port, 1);
+	limit_siwitch_init(&port);
+
+//	step_engines[1].limit_switch = port;
 	/* Limited switch init */
 
 	#endif

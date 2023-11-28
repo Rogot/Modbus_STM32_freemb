@@ -29,6 +29,7 @@ void init_step_engine(t_step_engine* step_eng,
 	(*step_eng).vel = SPEED_MIN;
 	(*step_eng).accel_size = 0;
 	(*step_eng).dir = 1;
+	(*step_eng).is_lim_sw = 0;
 
 	(*step_eng).engine_TIM_master = engine_TIM_master;
 	(*step_eng).engine_TIM_slave = engine_TIM_slave;
@@ -123,18 +124,18 @@ void move_step_engine(t_step_engine* step_eng, int16_t pos, float vel) {
 	
 	 if (2 * (*step_eng).cur_accel_size < (*step_eng).cnt) {
 		 (*step_eng).runCNT = (*step_eng).cnt -
-													2 * (*step_eng).cur_accel_size;
+							2 * (*step_eng).cur_accel_size;
 		 (*step_eng).speedupCNT = (*step_eng).cur_accel_size;
 		 (*step_eng).slowdownCNT = (*step_eng).cur_accel_size;
 	 } else {
 		 (*step_eng).runCNT = 0;
-		 if (!(*step_eng).manual_move_left && !(*step_eng).manual_move_right) {
+//		 if (!(*step_eng).manual_move_left && !(*step_eng).manual_move_right) {
 			(*step_eng).speedupCNT = (*step_eng).cnt / 2;
 			(*step_eng).slowdownCNT = (*step_eng).cnt / 2;
-		 } else { 
-			(*step_eng).speedupCNT = (*step_eng).cur_accel_size;
-			(*step_eng).slowdownCNT = (*step_eng).cur_accel_size;
-		 }
+//		 } else {
+//			(*step_eng).speedupCNT = (*step_eng).cur_accel_size;
+//			(*step_eng).slowdownCNT = (*step_eng).cur_accel_size;
+//		 }
 	 }
 	 
 	 if ((*step_eng).speedupCNT != (*step_eng).slowdownCNT) {
@@ -145,14 +146,14 @@ void move_step_engine(t_step_engine* step_eng, int16_t pos, float vel) {
 	 
 	 if ((*step_eng).speedupCNT == 0x0) {
 		 (*step_eng).engine_TIM_master->Instance->ARR = 1 / (*step_eng).vel;
-//		 (*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT
-//																						+ (*step_eng).dir * (*step_eng).runCNT;
+		 (*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT
+																						+ (*step_eng).dir * (*step_eng).runCNT;
 
 		 (*step_eng).mode = RUN;
 	 } else {
 		 
-//		 (*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT
-//													+ (*step_eng).dir * (*step_eng).speedupCNT;
+		 (*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT
+													+ (*step_eng).dir * (*step_eng).speedupCNT;
 
 		 
 		 HAL_DMA_Start_IT((*step_eng).engine_TIM_master->hdma[TIM_DMA_ID_UPDATE], 
@@ -164,8 +165,8 @@ void move_step_engine(t_step_engine* step_eng, int16_t pos, float vel) {
 			
 		 (*step_eng).mode=SPEEDUP;
 	 }
-	 (*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT
-	 													+ (*step_eng).dir * (*step_eng).speedupCNT;
+//	 (*step_eng).engine_TIM_slave->Instance->CCR1 = (*step_eng).engine_TIM_slave->Instance->CNT
+//	 													+ (*step_eng).dir * (*step_eng).speedupCNT;
 	 HAL_TIM_OC_Start((*step_eng).engine_TIM_master, TIM_CHANNEL_3);
 }
 
@@ -211,7 +212,8 @@ void HAL_TIM_OC_DelayElapsedCallback(TIM_HandleTypeDef *htim)
 *	@param (step_eng) - Step engine structure
 */
 void speed_up_step(t_step_engine *step_eng) {
-	if (!(*step_eng).manual_mode || (*step_eng).start_pose_mode) {
+	//if (!(*step_eng).manual_mode || (*step_eng).start_pose_mode) {
+	if ((*step_eng).start_pose_mode) {
 		(*step_eng).engine_TIM_slave->Instance->CCR1 =
 				(*step_eng).engine_TIM_slave->Instance->CNT
 						+ (*step_eng).dir * (*step_eng).runCNT;
@@ -225,9 +227,9 @@ void speed_up_step(t_step_engine *step_eng) {
 				(*step_eng).engine_TIM_slave->Instance->CNT
 						+ (*step_eng).dir * (*step_eng).runCNT;
 
-		if (!(*step_eng).manual_move_left && !(*step_eng).manual_move_right) {
+//		if (!(*step_eng).manual_move_left && !(*step_eng).manual_move_right) {
 			(*step_eng).mode = RUN;
-		}
+//		}
 	}
 	(*step_eng).engine_TIM_master->Instance->ARR = (uint16_t) 1
 			/ (*step_eng).vel;
@@ -254,7 +256,14 @@ void run_step(t_step_engine *step_eng) {
 		__HAL_TIM_ENABLE_DMA((*step_eng).engine_TIM_master, TIM_DMA_UPDATE);
 	} else {
 		if (!(*step_eng).manual_mode || (*step_eng).start_pose_mode) {
-			ctrl.programms->state = STATE_READ_COMMAND;
+			ctrl.programms[ctrl.exe_prog].state = STATE_READ_COMMAND;
+		}
+		if ((*step_eng).is_lim_sw) {
+			t_queue_dicr disc;
+			ctrl.programms[ctrl.exe_prog].state = STATE_SAND_REQUEST;
+			disc.state = END_PROGRAMM;
+			(*step_eng).is_lim_sw = 0;
+			ringBuf_put(disc, ctrl.queue);
 		}
 		HAL_TIM_OC_Stop((*step_eng).engine_TIM_master, TIM_CHANNEL_3);
 		(*step_eng).mode = STOP;
@@ -268,12 +277,12 @@ void run_step(t_step_engine *step_eng) {
 */
 void speed_down_step(t_step_engine *step_eng) {
 	if (!(*step_eng).manual_mode) {
-		ctrl.programms->state = STATE_READ_COMMAND;
+		ctrl.programms[ctrl.exe_prog].state = STATE_READ_COMMAND;
 	}
 	if ((*step_eng).start_pose_mode) {
 		t_queue_dicr disc;
 
-		ctrl.programms->state = STATE_SAND_REQUEST;
+		ctrl.programms[ctrl.exe_prog].state = STATE_SAND_REQUEST;
 
 		disc.state = HOME_IS_REACHED;
 		ringBuf_put(disc, ctrl.queue);

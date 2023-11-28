@@ -20,12 +20,15 @@ t_addr_conv PLC_addr[PLC_ADDR_MAX] = {
 
 USHORT conv_addr(t_addr_conv* addr_conv, USHORT hmi_addr) {
 	
-	uint8_t i = 0;
+	uint16_t i = 0;
 	uint8_t is_find = 0;
 	
 	while (!is_find) {
 		if (addr_conv[i++].HMI_addr == hmi_addr){
 			is_find = 1;
+		}
+		if (i > PLC_ADDR_MAX) {
+			return 404;
 		}
 	}
 	
