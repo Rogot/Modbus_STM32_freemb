@@ -10,6 +10,7 @@ static uint8_t usLenth = 0;
 uint16_t reqiest_data[10];
 peHMISendRequest peHMISendRequestCur;
 
+static int test = 0;
 
 /*
 * @bref: inital function for HMI
@@ -30,6 +31,7 @@ void init_HMI(t_control* contrl, int* usRegBuf) {
 	TIM9->PSC = DELAY_PSC_BASE; /* 72 MHz / 36000 = 2 kHz */
 	TIM9->ARR = DELAY_ARR_BASE /* 2000 Hz / 2 = 1000 Hz = 1 ms */;
 	NVIC_EnableIRQ(TIM1_BRK_TIM9_IRQn);
+
 
 	for (uint8_t i = 0; i < CURV_MAX_NUM; i++) {
 		if (contrl->HMI_curves[i].tim != NULL) {
@@ -65,34 +67,46 @@ void init_HMI(t_control* contrl, int* usRegBuf) {
 * @param (data) - data for sending
 * @param (cmd) - read/write mode
 * @param (len) - data lenth
+* @return - package transmit state
 */
-void send_request(uint8_t ucSlaveAddress, uint8_t* data, uint8_t cmd, uint8_t len) {
+HAL_StatusTypeDef send_request(uint8_t ucSlaveAddress, uint8_t* data, uint8_t cmd, uint8_t len) {
 
+	/*
+	 * data[0] and data[1] is address in registers (if we image data in 8 bites)
+	 * data[2] and data[3] is data for writing
+	 * */
+
+	HAL_StatusTypeDef pState;
 	static uint8_t	 ucHIMFrame_TX[50];
 	static uint8_t 	 usLength;
-	uint8_t addr = data[0] - 1;
-	uint8_t i = 0;
+	uint8_t addr = data[0];
+	uint8_t i = 2;
 
 	if (len % 2 != 0) {
 		len++;
 	}
-	data[0] = PLC_addr[addr].HMI_addr >> 8;
-	data[1] = PLC_addr[addr].HMI_addr & 0xFF;
+
+	uint16_t hmi_addr = conv_addr_to_HMI(PLC_addr, addr);
+
+//	data[0] = hmi_addr >> 8;
+//	data[1] = hmi_addr & 0xFF;
 	usLength = 0;
 	ucHIMFrame_TX[usLength++] = 0x5A;
 	ucHIMFrame_TX[usLength++] = ucSlaveAddress; 			/* START BIT */
-	ucHIMFrame_TX[usLength++] = (uint8_t)(len) + 2; 	    /* REQUEST SIZE (WORDS) */
+	ucHIMFrame_TX[usLength++] = (uint8_t)(len) * 2 + 1; 	/* REQUEST SIZE (in bytes) */
 	ucHIMFrame_TX[usLength++] = cmd;						/* READ/WRITE */
-	ucHIMFrame_TX[usLength++] = data[i++];					/* ADDR */
-	ucHIMFrame_TX[usLength++] = data[i++];
-	ucHIMFrame_TX[usLength++] = (uint8_t)len / 2 - 1;		/* DATA READ (WORDS) */
+	ucHIMFrame_TX[usLength++] = hmi_addr >> 8;					/* ADDR */
+	ucHIMFrame_TX[usLength++] = hmi_addr & 0xFF;
+	ucHIMFrame_TX[usLength++] = (uint8_t)len - 1;			/* DATA READ (in WORDS) */
 	ucHIMFrame_TX[usLength++] = data[i++];					/* DATA */
-	ucHIMFrame_TX[usLength++] = data[i++];
+	ucHIMFrame_TX[usLength++] = data[i];
 	//while (i < len) {
 	//	ucHIMFrame_TX[usLength++] = data[i++]; 				/* FILL FRAME BY DATA */
 	//}
 
-	peHMISendRequestCur(ucSlaveAddress, ucHIMFrame_TX, usLength);
+	pState = peHMISendRequestCur(ucSlaveAddress, ucHIMFrame_TX, usLength);
+
+	return pState;
 }
 
 /*
@@ -206,6 +220,9 @@ void move_SE_to(t_control* contrl, uint8_t num) {
 
 	if (contrl->is_manual == 0x00 && contrl->is_launch >= 0x01
 			&& contrl->dev->step_engine[num].mode == STOP) {
+
+		contrl->dev->step_engine[num].manual_mode = 0x00;
+
 		contrl->programms[contrl->exe_prog].state = STATE_BUSY_COMMAND;
 		if (contrl->programms[contrl->exe_prog].par2 > MAX_VEL_PROG) {
 			contrl->programms[contrl->exe_prog].par2 = MAX_VEL_PROG;
@@ -238,6 +255,8 @@ void move_SE_to(t_control* contrl, uint8_t num) {
 void control_BLCD(t_control* contrl) {
 	if (contrl->is_manual == 0x00 && contrl->is_launch >= 0x01) {
 
+		t_queue_dicr disc;
+
 		contrl->dev->bldc_engine->power = contrl->programms[contrl->exe_prog].par1;
 
 		if (contrl->dev->bldc_engine->power > 0) {
@@ -246,6 +265,10 @@ void control_BLCD(t_control* contrl) {
 			stop_BLDC(contrl->dev->bldc_engine);
 		}
 		contrl->programms[contrl->exe_prog].state = STATE_READ_COMMAND;
+
+		/* Send mixing speed */
+		disc.state = MIXING_SPEED;
+		ringBuf_put(disc, ctrl.queue);
 	}
 }
 
@@ -284,14 +307,19 @@ void munual_mode(t_control* contrl, uint8_t num) {
 	contrl->dev->step_engine[num].manual_mode = 0x01;
 
 	if (contrl->current_vel != 0x00 && contrl->dev->step_engine[num].mode == STOP) {
-		if (contrl->dev->step_engine[num].manual_move_left) {
+
+		if (contrl->current_vel > MAX_MANUAL_VEL) {
+			contrl->current_vel = MAX_MANUAL_VEL;
+		}
+
+		if (contrl->dev->step_engine[num].manual_move_left != 0) {
 			move_step_engine(&contrl->dev->step_engine[num], BASE_STEP_MANUAL * RATIO_GEARBOX,
-					(float) ((float) contrl->current_vel / BASE_FREQ
+					(float) ((float) contrl->current_vel * 10 / BASE_FREQ
 					/ ANFLE_ONE_STEP * 2));
 		}
-		else if (contrl->dev->step_engine[num].manual_move_right) {
+		else if (contrl->dev->step_engine[num].manual_move_right != 0) {
 			move_step_engine(&contrl->dev->step_engine[num], -BASE_STEP_MANUAL * RATIO_GEARBOX,
-					(float) ((float) contrl->current_vel / BASE_FREQ
+					(float) ((float) contrl->current_vel * 10 / BASE_FREQ
 					/ ANFLE_ONE_STEP * 2));
 		}
 	}
@@ -304,14 +332,14 @@ void munual_mode(t_control* contrl, uint8_t num) {
 */
 void move_start_pos(t_control* contrl, uint8_t num) {
 	int32_t start_pos = START_POS_VALUE;
-	int32_t cur_pos = contrl->dev->step_engine->engine_TIM_slave->Instance->CCR1;
+	int32_t cur_pos = contrl->dev->step_engine[num].engine_TIM_slave->Instance->CCR1;
 
 	int32_t res = (int16_t)start_pos - (int16_t )cur_pos;
 
 	if ((res > 1 || res < -1)
 				&& contrl->current_vel != 0x0) {
 		move_step_engine(&contrl->dev->step_engine[num], (int16_t )(res), (float)(
-							(float)contrl->current_vel* RATIO_GEARBOX / BASE_FREQ
+							(float)contrl->current_vel * RATIO_GEARBOX / BASE_FREQ
 							/ ANFLE_ONE_STEP * 2));
 	} else {
 
@@ -327,7 +355,7 @@ void move_start_pos(t_control* contrl, uint8_t num) {
 /*
 * 	@bref: main loop for control HMI request
 *	@param (contrl) - all parameters for controlling by HMI
-*	@param (usRegBuf) - MODBUS array
+*	@param (usRegBuf) - registers buffer
 */
 void eHMIPoll(t_control* contrl, int* usRegBuf) {
 
@@ -345,14 +373,14 @@ void eHMIPoll(t_control* contrl, int* usRegBuf) {
 
 		case VAC_SETPOINT_LOWER:
 
-			//TO DO: pump ON
-			pump_ON();
+			//TO DO: pump OFF
+			pump_OFF();
 
 			break;
 		case VAC_SETPOINT_UPPER:
 
-			//TO DO: pump OFF
-			pump_OFF();
+			//TO DO: pump ON
+			pump_ON();
 
 			break;
 		}
@@ -374,6 +402,8 @@ void eHMIPoll(t_control* contrl, int* usRegBuf) {
 		if (pState == STATE_END_PROGRAMM) {
 			contrl->programms[contrl->exe_prog].state = STATE_SAND_REQUEST;
 			discr.state = END_PROGRAMM;
+			ringBuf_put(discr, contrl->queue);
+			discr.state = MIXING_SPEED;
 			ringBuf_put(discr, contrl->queue);
 		}
 		break;
@@ -406,58 +436,52 @@ void eHMIPoll(t_control* contrl, int* usRegBuf) {
 
 	case STATE_SAND_REQUEST:
 
-		usLenth = 0;
-
-		discr = ringBuf_pop(contrl->queue);
-
-		if (discr.state != NONE_REQUEST) {
-			switch(discr.state) {
-
-			case HOME_IS_REACHED:
-				contrl->start_pos_step_engine = 0x0;
-				usRegBuf[STEP_ENGINE_START_POS_MS] = 0x0;
-				discr.reg_num = STEP_ENGINE_START_POS_MS;
-				break;
-			case END_PROGRAMM:
-				contrl->is_launch = 0x0;
-				usRegBuf[LAUNCH_PROGRAM] = 0x0;
-				discr.reg_num = LAUNCH_PROGRAM;
-				break;
-			}
-		}
-
-		/* Request formation */
-		reqiest_data[usLenth++] = discr.reg_num;
-		usLenth++;
-		reqiest_data[usLenth++] = usRegBuf[discr.reg_num] >> 8;
-		reqiest_data[usLenth++] = usRegBuf[discr.reg_num] & 0xFF;
-
-		send_request(0xA5, (uint8_t*)reqiest_data, 0x82, usLenth);
-
-		discr.state = NONE_REQUEST;
-
-		if (discr.state == NONE_REQUEST && contrl->is_launch != 0) {
-			contrl->programms[contrl->exe_prog].state = STATE_READ_COMMAND;
-		} else if (discr.state == NONE_REQUEST && contrl->is_launch == 0) {
-			contrl->programms[contrl->exe_prog].state = STATE_IDLE_COMMAND;
-		}
 		break;
 	}
 
-	#if STEP_ENGINE_ENABLE
-	if( contrl->is_manual >= 0x01 && contrl->is_launch == 0x00 ){
+	request_hundler(contrl, usRegBuf);
+
+	register_processing_hundler(contrl, usRegBuf);
+
+	/* Sending current vacuum value */
+	if (contrl->HMI_curves[0].state == CURV_SEND_DATA) {
+		//t_queue_dicr disc;
+		/* Send vacuum value */
+		discr.state = VACUUM_VALUE;
+		ringBuf_put(discr, ctrl.queue);
+
+		/* Send coordinate */
+		discr.state = STEP_ENGINE_CORRENT_COORD_X;
+		ringBuf_put(discr, ctrl.queue);
+		discr.state = STEP_ENGINE_CORRENT_COORD_Y;
+		ringBuf_put(discr, ctrl.queue);
+
+		contrl->HMI_curves[0].state = CURV_IDLE;
+		send_data_curve(0xA5, ctrl.dev->vac_sensor->cur_pres, 0x00);
+	}
+}
+
+/*
+* @bref: function handle requests changes
+* @param (contrl) - all parameters for controlling by HMI
+* @param (usRegBuf) - registers buffer
+*/
+void register_processing_hundler(t_control *contrl, int *usRegBuf) {
+#if STEP_ENGINE_ENABLE
+	if (contrl->is_manual >= 0x01 && contrl->is_launch == 0x00) {
 		contrl->is_manual = 0x00;
 		//contrl->dev->step_engine[usRegBuf[STEP_ENGINE_CHOOSE] - 1].start_pose_mode = 0x00;
 		if (usRegBuf[STEP_ENGINE_CHOOSE] > 0) {
 			munual_mode(contrl, usRegBuf[STEP_ENGINE_CHOOSE] - 1);
 		}
 	}
-	
+
 	if ((contrl->start_pos_step_engine && 0xFF) == 0x01) {
 		if (usRegBuf[STEP_ENGINE_CHOOSE] > 0
-				&& contrl->dev->step_engine[usRegBuf[STEP_ENGINE_CHOOSE] - 1].mode == STOP ) {
-			contrl->dev->step_engine[usRegBuf[STEP_ENGINE_CHOOSE] - 1].start_pose_mode = 0x01;
-			contrl->programms[contrl->exe_prog].state = STATE_BUSY_COMMAND;
+				&& contrl->dev->step_engine[usRegBuf[STEP_ENGINE_CHOOSE] - 1].mode == STOP) {
+			contrl->dev->step_engine[usRegBuf[STEP_ENGINE_CHOOSE] - 1].start_pose_mode =
+					0x01;
+//			contrl->programms[contrl->exe_prog].state = STATE_BUSY_COMMAND;
 			move_start_pos(contrl, usRegBuf[STEP_ENGINE_CHOOSE] - 1);
 		}
 	}
@@ -470,22 +494,133 @@ void eHMIPoll(t_control* contrl, int* usRegBuf) {
 		}
 	}
 
-	#endif
+	if (usRegBuf[SET_HOME] != 0) {
+		usRegBuf[SET_HOME] = 0;
+		contrl->dev->step_engine[usRegBuf[STEP_ENGINE_CHOOSE] - 1].engine_TIM_slave->Instance->CNT =
+				START_POS_VALUE;
+		contrl->dev->step_engine[usRegBuf[STEP_ENGINE_CHOOSE] - 1].engine_TIM_slave->Instance->CCR1 =
+				START_POS_VALUE;
 
-	/* Sending current vacuum value */
-	if (contrl->HMI_curves[0].state == CURV_SEND_DATA) {
-		contrl->HMI_curves[0].state = CURV_IDLE;
-		send_data_curve(0xA5, ctrl.dev->vac_sensor->cur_pres, 0x00);
+		t_queue_dicr discr;
+
+		discr.state = START_IS_SET;
+		ringBuf_put(discr, ctrl.queue);
 	}
 
-	#if FLASH_ENABLE
+#endif
+
+#if FLASH_ENABLE
 	if (contrl->save_prog != 0) {
 		usRegBuf[SAVE_PROGRAM] = 0x0;
 		refresh_prog_parameters_FLASH(contrl);
 	}
-	#endif
+#endif
 }
 
+/*
+* @bref: function handle requests to HMI
+* @param (contrl) - all parameters for controlling by HMI
+* @param (usRegBuf) - registers buffer
+* @param (discr) - request discriptor
+*/
+void request_hundler(t_control *contrl, int *usRegBuf) {
+	HAL_StatusTypeDef pState;
+	static t_queue_dicr discr;
+	float tmp;
+
+	/*Check available elements in buffer*/
+	if (ringBuf_getCount(contrl->queue) == 0) {
+		if (contrl->programms[contrl->exe_prog].state == STATE_SAND_REQUEST) {
+			if (contrl->is_launch != 0) {
+				contrl->programms[contrl->exe_prog].state = STATE_READ_COMMAND;
+			} else {
+				contrl->programms[contrl->exe_prog].state = STATE_IDLE_COMMAND;
+			}
+			contrl->queue->isReadyRead = 0x1;
+		}
+	} else {
+
+		usLenth = 0;
+
+
+		/* If we are ready read buffer and it have elements */
+		if (contrl->queue->isReadyRead == 0x1) {
+			discr = ringBuf_pop(contrl->queue);
+			contrl->queue->isRefresh = 0x0;
+			contrl->queue->isReadyRead = 0x0; /* don't allow read buffer */
+			switch (discr.state) {
+
+			case HOME_IS_REACHED:
+				contrl->start_pos_step_engine = 0x0;
+				usRegBuf[STEP_ENGINE_START_POS_MS] = 0x0;
+				discr.reg_num = STEP_ENGINE_START_POS_MS;
+				break;
+			case END_PROGRAMM:
+				contrl->is_launch = 0x0;
+				usRegBuf[LAUNCH_PROGRAM] = 0x0;
+				discr.reg_num = LAUNCH_PROGRAM;
+
+				break;
+			case STEP_ENGINE_CORRENT_COORD_X:
+				usRegBuf[X_COORD] =
+						(contrl->dev->step_engine[0].engine_TIM_slave->Instance->CNT
+								- START_POS_VALUE) / RATIO_GEARBOX;
+				discr.reg_num = X_COORD;
+				break;
+			case STEP_ENGINE_CORRENT_COORD_Y:
+				usRegBuf[Y_COORD] =
+						(contrl->dev->step_engine[1].engine_TIM_slave->Instance->CNT
+								- START_POS_VALUE) / RATIO_GEARBOX;
+				discr.reg_num = Y_COORD;
+				break;
+			case MIXING_SPEED:
+				usRegBuf[VELOCITY_MIX] = contrl->dev->bldc_engine->power;
+				discr.reg_num = VELOCITY_MIX;
+				break;
+			case VACUUM_VALUE:
+				tmp = (float) contrl->dev->vac_sensor->cur_pres
+						/ (float) MAX_SENCOR_VALUE * (float) 100;
+				usRegBuf[VACUUM_VALUE_REG] = (int) tmp;
+				discr.reg_num = VACUUM_VALUE_REG;
+
+				break;
+			case START_IS_SET:
+				usRegBuf[SET_HOME] = 0;
+				discr.reg_num = SET_HOME;
+
+				break;
+			}
+		}
+
+
+		/* Request formation */
+		reqiest_data[usLenth++] = discr.reg_num;
+
+		reqiest_data[usLenth] = usRegBuf[discr.reg_num] & 0xFF;
+		reqiest_data[usLenth++] |= usRegBuf[discr.reg_num] & 0xFF00;
+
+//		reqiest_data[usLenth] = usRegBuf[discr.reg_num] & 0xFF00;
+//		reqiest_data[usLenth++] |= usRegBuf[discr.reg_num] & 0xFF;
+
+//		reqiest_data[usLenth] = usRegBuf[discr.reg_num] >> 8;
+//		reqiest_data[usLenth++] = usRegBuf[discr.reg_num] & 0xFF;
+//		reqiest_data[usLenth++] = usRegBuf[discr.reg_num];
+
+//		usLenth++;
+
+		pState = send_request(0xA5, (uint8_t*) reqiest_data, 0x82, usLenth);
+
+		if (pState != HAL_BUSY) {
+				contrl->queue->isReadyRead = 0x1;
+				//contrl->queue->isRefresh = 0x0;
+		}
+	}
+}
+
+/*
+* @bref: function handle reaching of limit switches
+* @param (step_eng) - engine with worked limit switches
+*/
 void reach_lim_switch(t_step_engine* step_eng) {
 	uint32_t start_pos = step_eng->limit_switch_coord;
 	uint32_t cur_pos = step_eng->engine_TIM_slave->Instance->CNT;
@@ -494,6 +629,7 @@ void reach_lim_switch(t_step_engine* step_eng) {
 
 	move_step_engine(step_eng, (int16_t) (res),
 			(float) ((float) 5 * RATIO_GEARBOX / BASE_FREQ / ANFLE_ONE_STEP * 2));
+	step_eng->is_lim_sw = 0;
 }
 
 /*
@@ -502,22 +638,22 @@ void reach_lim_switch(t_step_engine* step_eng) {
 * @param (usRegBuf) - MODBUS buffer pointer
 */
 void refresh_reg(t_control* contrl, int* usRegBuf) {
-	
+
 	contrl->save_prog = usRegBuf[SAVE_PROGRAM];
 	contrl->start_pos_step_engine = usRegBuf[STEP_ENGINE_START_POS_MS];
-	
+
 	contrl->is_launch = usRegBuf[LAUNCH_PROGRAM];
 	contrl->is_manual = usRegBuf[STEP_ENGINE_ON_MC];
-	
+
 	contrl->current_vel = usRegBuf[STEP_ENGINE_VEL_MC];
 
 	contrl->exe_prog = usRegBuf[NUM_EXE_PROGRAM] - 1;
-	
 
-	for (uint8_t i = 0; i < ENGINE_NUM; i++) {
-		contrl->dev->step_engine[i].manual_move_left = (uint8_t)usRegBuf[STEP_ENGINE_MOVE_LEFT];
-		contrl->dev->step_engine[i].manual_move_right = (uint8_t)usRegBuf[STEP_ENGINE_MOVE_RIGHT];
-	}
+
+
+	contrl->dev->step_engine[usRegBuf[STEP_ENGINE_CHOOSE] - 1].manual_move_left = (uint16_t)usRegBuf[STEP_ENGINE_MOVE_LEFT];
+	contrl->dev->step_engine[usRegBuf[STEP_ENGINE_CHOOSE] - 1].manual_move_right = (uint16_t)usRegBuf[STEP_ENGINE_MOVE_RIGHT];
+
 }
 /*
 * @bref: search start position - "0" via end cap
@@ -531,14 +667,14 @@ void search_home(t_control* contrl) {
 	contrl->dev->step_engine->engine_TIM_slave->Instance->CCR1 = contrl->dev->step_engine->engine_TIM_slave->Instance->CNT
 								+ contrl->dev->step_engine->dir * contrl->dev->step_engine->slowdownCNT;
 	contrl->dev->step_engine->mode = SLOWDOWN;
-				
+
 	HAL_DMA_Start_IT(contrl->dev->step_engine->engine_TIM_master->hdma[TIM_DMA_ID_UPDATE],
 				(uint32_t)(contrl->dev->step_engine->slowdownbuf
 								+ contrl->dev->step_engine->accel_size - contrl->dev->step_engine->slowdownCNT),
 				(uint32_t)&contrl->dev->step_engine->engine_TIM_master->Instance->ARR, contrl->dev->step_engine->slowdownCNT);
-				
+
 	__HAL_TIM_ENABLE_DMA(contrl->dev->step_engine->engine_TIM_master, TIM_DMA_UPDATE);
-	
+
 }
 
 /*
@@ -591,12 +727,17 @@ void start_delay(prog_dscrptr*  programm, uint8_t num) {
 /****** IRQ Handlers ******/
 
 /**
-  * @brief This function handles TIM1 trigger and commutation interrupts and TIM11 global interrupt.
+  * @brief This function handles TIM7 trigger and commutation interrupts and TIM11 global interrupt.
   */
 void TIM7_IRQHandler(void)
 {
+
 	ctrl.HMI_curves[0].state = CURV_SEND_DATA;
+
 	HAL_TIM_IRQHandler(ctrl.HMI_curves[0].tim);
+
+	/* available refresh system data */
+	ctrl.queue->isRefresh = 0x1;
 }
 
 /**

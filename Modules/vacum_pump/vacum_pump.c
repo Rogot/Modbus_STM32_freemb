@@ -12,10 +12,10 @@ void init_vac_pump(t_vac_pump* vPump, uint16_t offset, uint16_t setpoint) {
 	vPump->offset = offset;
 	vPump->state = PUMP_IS_ON;
 
-	/* PB9 - control vacuum ON/OFF */
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
-	GPIOB->MODER |= GPIO_MODER_MODE9_1; /* Output mode */
-	GPIOB->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR9_1;
+//	/* PB9 - control vacuum ON/OFF */
+//	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
+//	GPIOB->MODER |= GPIO_MODER_MODE9_1; /* Output mode */
+//	GPIOB->OSPEEDR |= GPIO_OSPEEDER_OSPEEDR9_1;
 }
 
 /*

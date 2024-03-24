@@ -310,9 +310,10 @@ void eDWINFuncWriteRegister(UCHAR * pucFrame, int * registers, USHORT * usLen) {
 /*
 * @bref: send a request to other device
 * @param (reg) - programm parameters
-* @param num - number of saved programs
+* @param (num) - number of saved programs
+* @return - package transmit state
 */
-void eDWINRequestSend( UCHAR slaveAddress, const UCHAR * pucFrame, USHORT usLength ) {
+HAL_StatusTypeDef eDWINRequestSend( UCHAR slaveAddress, const UCHAR * pucFrame, USHORT usLength ) {
 	HAL_StatusTypeDef uStat;
 
 	//HAL_UARTEx_ReceiveToIdle_IT(DWIN_uart, (uint8_t*) ucDWINBuf,
@@ -333,6 +334,8 @@ void eDWINRequestSend( UCHAR slaveAddress, const UCHAR * pucFrame, USHORT usLeng
 						DWIN_SER_PDU_SIZE_MAX);
 		xDWINPortEventPost(prevEvent);
 	}
+
+	return uStat;
 }
 
 /*

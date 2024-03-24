@@ -24,6 +24,7 @@
 #define STEPS_NUM 								( 3 )
 
 #define MAX_VEL_PROG							500000
+#define MAX_MANUAL_VEL							70
 
 #define STAGE_NUM								( 3 )
 
@@ -45,6 +46,12 @@
 #define STEP_ENGINE_START_POS_MS				( 4 )			 		/* 5004 */
 #define STEP_ENGINE_MOVE_RIGHT					( 5	)					/* 5056 */
 #define STEP_ENGINE_MOVE_LEFT					( 21 )					/* 5054 */
+
+/* SYSTEM PARAMETERS */
+#define VACUUM_VALUE_REG						( 11 )					/* 5026 */
+#define X_COORD									( 12 )					/* 5028 */
+#define Y_COORD									( 13 )					/* 5030 */
+#define VELOCITY_MIX							( 14 )					/* 5032 */
 
 /* PROGRAM */
 #define NUM_EXE_PROGRAM							( 6 ) 			 	 	/* 5014 */
@@ -100,7 +107,7 @@ typedef struct CONTROL {
 } t_control;
 
 /* FUNCTIONS */
-typedef void( *peHMISendRequest ) ( uint8_t pucTrnAddress,
+typedef HAL_StatusTypeDef( *peHMISendRequest ) ( uint8_t pucTrnAddress,
 									const uint8_t * pucFrame,
 									uint16_t * pusLength);
 
@@ -124,9 +131,6 @@ void control_BLCD(t_control* contrl);
 /* Vacuum sensor */
 void read_data_vac_sens(t_control* contrl);
 
-void refresh_reg(t_control* contrl, int* usRegBuf);
-void send_request(uint8_t ucSlaveAddress, uint8_t* data, uint8_t cmd, uint8_t len);
-
 /* Vacuum pump */
 eVacSetPoint is_setpoint(t_vac_pump* vPump, t_vac_sen* vSen);
 
@@ -136,5 +140,10 @@ void init_HMI(t_control* contrl, int* usRegBuf);
 void send_data_curve(uint8_t ucSlaveAddress, uint16_t data, uint8_t curve);
 void refresh_curv( t_control* contrl );
 void start_delay(prog_dscrptr*  programm, uint8_t num);
+void request_hundler( t_control* contrl, int* usRegBuf );
+void register_processing_hundler( t_control* contrl, int* usRegBuf );
+void refresh_reg(t_control* contrl, int* usRegBuf);
+
+HAL_StatusTypeDef send_request(uint8_t ucSlaveAddress, uint8_t* data, uint8_t cmd, uint8_t len);
 
 #endif //!HMI_INTERFACE_H

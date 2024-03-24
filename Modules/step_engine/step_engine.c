@@ -20,7 +20,6 @@ extern uint8_t is_start_pos;
 * @param (engine_TIM_master) - pointer to the Master Timer
 * @param (engine_TIM_slave) - pointer to the Slave Timer
 */
-
 void init_step_engine(t_step_engine* step_eng,
 						TIM_HandleTypeDef* engine_TIM_master,
 						TIM_HandleTypeDef* engine_TIM_slave) {
@@ -259,11 +258,13 @@ void run_step(t_step_engine *step_eng) {
 			ctrl.programms[ctrl.exe_prog].state = STATE_READ_COMMAND;
 		}
 		if ((*step_eng).is_lim_sw) {
-			t_queue_dicr disc;
-			ctrl.programms[ctrl.exe_prog].state = STATE_SAND_REQUEST;
-			disc.state = END_PROGRAMM;
-			(*step_eng).is_lim_sw = 0;
-			ringBuf_put(disc, ctrl.queue);
+			if (!(*step_eng).manual_mode) {
+				t_queue_dicr disc;
+				ctrl.programms[ctrl.exe_prog].state = STATE_SAND_REQUEST;
+				disc.state = END_PROGRAMM;
+				(*step_eng).is_lim_sw = 0;
+				ringBuf_put(disc, ctrl.queue);
+			}
 		}
 		HAL_TIM_OC_Stop((*step_eng).engine_TIM_master, TIM_CHANNEL_3);
 		(*step_eng).mode = STOP;
@@ -280,12 +281,13 @@ void speed_down_step(t_step_engine *step_eng) {
 		ctrl.programms[ctrl.exe_prog].state = STATE_READ_COMMAND;
 	}
 	if ((*step_eng).start_pose_mode) {
-		t_queue_dicr disc;
+		t_queue_dicr discr;
 
-		ctrl.programms[ctrl.exe_prog].state = STATE_SAND_REQUEST;
+		//ctrl.programms[ctrl.exe_prog].state = STATE_SAND_REQUEST;
 
-		disc.state = HOME_IS_REACHED;
-		ringBuf_put(disc, ctrl.queue);
+		discr.state = HOME_IS_REACHED;
+		ringBuf_put(discr, ctrl.queue);
+		(*step_eng).start_pose_mode = 0x0;
 	}
 
 	HAL_TIM_OC_Stop((*step_eng).engine_TIM_master, TIM_CHANNEL_3);

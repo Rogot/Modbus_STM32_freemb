@@ -11,6 +11,9 @@
 #include <stm32f405xx.h>
 #include "stm32f4xx_hal.h"
 
+#define MAX_SENCOR_VALUE				4096
+
+
 typedef struct VACUM_SEN {
 uint16_t cur_pres;
 ADC_HandleTypeDef* adc;

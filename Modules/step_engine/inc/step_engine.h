@@ -55,8 +55,8 @@ typedef struct STEP_ENGINE {
 	int16_t cnt;
 	uint8_t manual_mode;
 	uint8_t start_pose_mode;
-	uint8_t manual_move_right;
-	uint8_t manual_move_left;
+	uint16_t manual_move_right;
+	uint16_t manual_move_left;
 	TIM_HandleTypeDef* engine_TIM_master; //TIM3
 	TIM_HandleTypeDef* engine_TIM_slave; //TIM2
 	uint8_t is_lim_sw;

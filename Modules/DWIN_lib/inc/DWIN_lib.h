@@ -152,7 +152,7 @@ eDWINErrorCode eDWINReceive( UCHAR * pucRcvAddress, UCHAR * pucFrame, USHORT * p
 												 
 eDWINErrorCode eDWINSend( UCHAR slaveAddress, const UCHAR * pucFrame, USHORT usLength );
 
-void eDWINRequestSend( UCHAR slaveAddress, const UCHAR * pucFrame, USHORT usLength );
+HAL_StatusTypeDef eDWINRequestSend( UCHAR slaveAddress, const UCHAR * pucFrame, USHORT usLength );
 																				 
 eDWINErrorCode eDWINEnable( void );
 																				 

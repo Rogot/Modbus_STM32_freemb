@@ -13,5 +13,6 @@ typedef struct ADDR_CONV {
 }t_addr_conv;
 
 USHORT conv_addr(t_addr_conv* addr_conv, USHORT hmi_addr);
+USHORT conv_addr_to_HMI(t_addr_conv* addr_conv, USHORT reg_addr);
 
 #endif //!DWIN_ADDR_CONV_H

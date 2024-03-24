@@ -170,6 +170,15 @@ void init_Test_Time(void) {
 
 }
 
+void func_hard_fault(void);
+
+void func_hard_fault(void) //Функция, вызов которой приведет к отказу
+{
+  while(1) continue;
+}
+
+
+
 /* USER CODE END 0 */
 
 /**
@@ -179,6 +188,10 @@ void init_Test_Time(void) {
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+
+//	void (*ptr_hard_fault_func) (void); //Объявляем указатель на функцию отказа
+//	ptr_hard_fault_func = (((uint8_t* )func_hard_fault) - 1); //Присваиваем ему значение со сброшенным младшим битом
+//	ptr_hard_fault_func(); //Вызов функции отказа
 
   /* USER CODE END 1 */
 
@@ -242,10 +255,20 @@ int main(void)
 	
 	#if PEREPH_ENABLE
 	
+	/* Ring buffer init */
+	t_ring_buf ring_buf;
+	t_queue_dicr queue[RING_BUF_SIZE];
+
+	t_RING_BUF_ErrorStatus rStatus = ringBuf_init(&ring_buf, queue, RING_BUF_SIZE);
+
+	if (rStatus == RING_BUFFER_SUCCESS) {
+		ctrl.queue = &ring_buf;
+	}
+
 	ctrl.dev = &dev;
 	ctrl.programms = programms;
 
-	ctrl.HMI_curves[0].refresh_rate = 2;
+	ctrl.HMI_curves[0].refresh_rate = 10;
 	ctrl.HMI_curves[0].tim = &htim7;
 	
 	init_HMI(&ctrl, ucRegistersBuf);
@@ -324,15 +347,6 @@ int main(void)
 
 	HAL_ADC_Start_IT(&hadc1);
 	HAL_TIM_OC_Start_IT(&htim1, TIM_CHANNEL_1);
-
-	t_ring_buf* ring_buf;
-	t_queue_dicr queue[20];
-
-	t_RING_BUF_ErrorStatus rStatus = ringBuf_init(ring_buf, queue, 20);
-
-	if (rStatus == RING_BUFFER_SUCCESS) {
-		ctrl.queue = ring_buf;
-	}
 
   /* USER CODE END 2 */
 
@@ -949,6 +963,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PB7 PB9 */
+  GPIO_InitStruct.Pin = GPIO_PIN_7|GPIO_PIN_9;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 }
 
